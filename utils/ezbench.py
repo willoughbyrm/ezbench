@@ -1297,25 +1297,6 @@ class Metric:
         else:
             return 0
 
-class ImgvalFrameResult:
-    def __init__(self, frameid, frame_hash, ref_hash, rmse):
-        self.frameid = frameid
-        self.frame_hash = frame_hash
-        self.ref_hash = ref_hash
-        self.rmse = rmse
-
-class ImgvalRun:
-    def __init__(self, runfilepath):
-        self.frames = dict()
-        with open(runfilepath, 'rt') as f:
-            for line in f.readlines():
-                fields = line.split(',')
-                if len(fields) == 4:
-                    self.frames[fields[0]] = ImgvalFrameResult(fields[0], fields[1],
-                                                               fields[2], fields[3])
-                else:
-                    print("ERROR: ImgvalRun: Invalid format for file '{}'".format(runfilepath))
-
 class BenchResult:
     def __init__(self, commit, benchmark, data_raw_file):
         self.commit = commit
@@ -1760,21 +1741,6 @@ class EventUnitResultUnstable:
         return msg.format(self.commit.sha1, self.bench_sub_test,
                           self.prev_status, self.new_status)
 
-class EventRenderingChange:
-    def __init__(self, benchmark, commit_range, old_result, new_result):
-        if old_result.frameid != new_result.frameid:
-            raise ValueError("The frame ID of the old and new result do not match")
-
-        self.benchmark = benchmark
-        self.commit_range = commit_range
-        self.old_result = old_result
-        self.new_result = new_result
-        self.frameid = old_result.frameid
-
-    def __str__(self):
-        msg = "{} changed the rendering of {}'s frame {}"
-        return msg.format(self.commit_range, self.benchmark.full_name, self.frameid)
-
 class Report:
     def __init__(self, log_folder, benchmarks, commits, notes):
         self.log_folder = log_folder
@@ -1901,21 +1867,6 @@ class Report:
                     for test in result.unit_results:
                         subtest = BenchSubTest(result.benchmark, test)
                         unittest_prev[str(subtest)] = (subtest, commit, result.unit_results[test])
-                elif result.test_type == "imgval":
-                    # TODO: Aggregate the results if we ever want to verify the
-                    # stability of the rendering
-
-                    if bench in bench_prev:
-                        commit_range = EventCommitRange(bench_prev[bench].commit, commit)
-                        for frame in result.runs[0].frames:
-                            frame_prev = bench_prev[bench].runs[0].frames[frame]
-                            frame = result.runs[0].frames[frame]
-
-                            if frame_prev.frame_hash != frame.frame_hash:
-                                event = EventRenderingChange(result.benchmark, commit_range,
-                                                            frame_prev, frame)
-                                self.events.append(event)
-                    bench_prev[bench] = result
                 else:
                     print("WARNING: enhance_report: unknown test type {}".format(result.test_type))
 
@@ -2028,7 +1979,7 @@ def genPerformanceReport(log_folder, silentMode = False, restrict_to_commits = [
     # Find all the result files and sort them by sha1
     files_list = os.listdir()
     testFiles = dict()
-    commit_bench_file_re = re.compile(r'^(.+)_(bench|unit|imgval)_[^\.]+(.metrics_.+)?$')
+    commit_bench_file_re = re.compile(r'^(.+)_(bench|unit)_[^\.]+(.metrics_.+)?$')
     for f in files_list:
         if os.path.isdir(f):
             continue
@@ -2120,8 +2071,6 @@ def genPerformanceReport(log_folder, silentMode = False, restrict_to_commits = [
                         result.runs.append(data)
                 elif testType == "unit":
                     result.runs.append(readUnitRun(runFile))
-                elif testType == "imgval":
-                    result.runs.append(ImgvalRun(runFile))
                 else:
                     print("WARNING: Ignoring results because the type '{}' is unknown".format(testType))
                     continue
