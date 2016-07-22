@@ -1754,6 +1754,32 @@ class Report:
 
         self.__parse_report__(silentMode, restrict_to_commits)
 
+    def __readNotes__(self):
+        try:
+            with open("notes", 'rt') as f:
+                return f.readlines()
+        except:
+            return []
+
+    def __readCommitLabels__(self):
+        labels = dict()
+        try:
+            f = open( "commit_labels", "r")
+            try:
+                labelLines = f.readlines()
+            finally:
+                f.close()
+        except IOError:
+            return labels
+
+        for labelLine in labelLines:
+            fields = labelLine.split(" ")
+            sha1 = fields[0]
+            label = fields[1].split("\n")[0]
+            labels[sha1] = label
+
+        return labels
+
     def __parse_report__(self, silentMode, restrict_to_commits):
         # Save the current working directory and switch to the log folder
         cwd = os.getcwd()
@@ -1772,7 +1798,7 @@ class Report:
             return False
 
         # Read all the commits' labels
-        labels = readCommitLabels()
+        labels = self.__readCommitLabels__()
 
         # Check that there are commits
         if (len(commitsLines) == 0):
@@ -1901,7 +1927,7 @@ class Report:
         self.benchmarks = sorted(self.benchmarks, key=lambda bench: bench.full_name)
 
         # Read the notes before going back to the original folder
-        notes = readNotes()
+        notes = self.__readNotes__()
 
         # Go back to the original folder
         os.chdir(cwd)
@@ -2073,32 +2099,6 @@ def readUnitRun(filepath):
             if len(fields) == 2:
                 tests[fields[0]] = fields[1].strip()
     return tests
-
-def readCommitLabels():
-    labels = dict()
-    try:
-        f = open( "commit_labels", "r")
-        try:
-            labelLines = f.readlines()
-        finally:
-            f.close()
-    except IOError:
-        return labels
-
-    for labelLine in labelLines:
-        fields = labelLine.split(" ")
-        sha1 = fields[0]
-        label = fields[1].split("\n")[0]
-        labels[sha1] = label
-
-    return labels
-
-def readNotes():
-    try:
-        with open("notes", 'rt') as f:
-            return f.readlines()
-    except:
-        return []
 
 def genPerformanceReport(log_folder, silentMode = False, restrict_to_commits = []):
     return Report(log_folder, silentMode, restrict_to_commits)
