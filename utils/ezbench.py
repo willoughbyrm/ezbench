@@ -1297,7 +1297,7 @@ class Metric:
         else:
             return 0
 
-class BenchResult:
+class TestResult:
     def __init__(self, commit, benchmark, data_raw_file):
         self.commit = commit
         self.benchmark = benchmark
@@ -1872,7 +1872,7 @@ class Report:
                     self.benchmarks.append(benchmark)
 
                 # Create the result object
-                result = BenchResult(commit, benchmark, testFile)
+                result = TestResult(commit, benchmark, testFile)
 
                 # Read the data and abort if there is no data
                 result.data, result.unit_str, result.more_is_better = readCsv(testFile)
