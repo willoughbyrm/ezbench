@@ -1485,17 +1485,22 @@ class BenchResult:
 
 
 class Commit:
-    def __init__(self, sha1, full_name, compile_log, patch, label):
+    def __init__(self, sha1, full_name, label):
         self.sha1 = sha1
         self.full_name = full_name
-        self.compile_log = compile_log
-        self.patch = patch
-        self.results = []
-        self.geom_mean_cache = -1
         self.label = label
 
+        self.results = []
+        self.geom_mean_cache = -1
+
+        self.__parse_commit_information__()
+
+    def __parse_commit_information__(self):
+        self.compile_log = self.sha1 + "_compile_log"
+        self.patch = self.sha1 + ".patch"
+
         # Set default values then parse the patch
-        self.full_sha1 = sha1
+        self.full_sha1 = self.sha1
         self.author = "UNKNOWN AUTHOR"
         self.commiter = "UNKNOWN COMMITER"
         self.author_date = datetime.min
@@ -1507,7 +1512,7 @@ class Commit:
         self.tested_by = set()
         self.bugs = set()
         try:
-            with open(patch, 'r') as f:
+            with open(self.patch, 'r') as f:
                 log_started = False
                 fdo_bug_re = re.compile('fdo#(\d+)')
                 basefdourl = "https://bugs.freedesktop.org/show_bug.cgi?id="
@@ -1549,18 +1554,20 @@ class Commit:
                                     bugid = fdo_bug_m.groups()[0]
                                     self.bugs |= {basefdourl + bugid}
         except Exception:
+            self.patch = None
             pass
 
         # Look for the exit code
         self.compil_exit_code = EzbenchExitCode.UNKNOWN
         try:
-            with open(compile_log, 'r') as f:
+            with open(self.compile_log, 'r') as f:
                 for line in f:
                     pass
                 # Line contains the last line of the report, parse it
                 if line.startswith("Exiting with error code "):
                     self.compil_exit_code = EzbenchExitCode(int(line[24:]))
         except Exception:
+            self.compile_log = None
             pass
 
     def build_broken(self):
@@ -1829,13 +1836,12 @@ class Report:
         for commitLine in commitsLines:
             full_name = commitLine.strip(' \t\n\r')
             sha1 = commitLine.split()[0]
-            compile_log = sha1 + "_compile_log"
-            patch = sha1 + ".patch"
+
             label = labels.get(sha1, sha1)
             if (len(restrict_to_commits) > 0 and sha1 not in restrict_to_commits
                 and label not in restrict_to_commits):
                 continue
-            commit = Commit(sha1, full_name, compile_log, patch, label)
+            commit = Commit(sha1, full_name, label)
 
             # Add the commit to the list of commits
             commit.results = sorted(commit.results, key=lambda res: res.benchmark.full_name)
