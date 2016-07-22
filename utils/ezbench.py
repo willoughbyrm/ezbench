@@ -1742,14 +1742,169 @@ class EventUnitResultUnstable:
                           self.prev_status, self.new_status)
 
 class Report:
-    def __init__(self, log_folder, benchmarks, commits, notes):
+    def __init__(self, log_folder, silentMode = False, restrict_to_commits = []):
         self.log_folder = log_folder
         self.name = log_folder.split(os.sep)[-1]
-        self.benchmarks = benchmarks
-        self.commits = commits
-        self.notes = notes
+
+        self.benchmarks = list()
+        self.commits = list()
+        self.notes = list()
         self.events = list()
         self.test_type = "unknown"
+
+        self.__parse_report__(silentMode, restrict_to_commits)
+
+    def __parse_report__(self, silentMode, restrict_to_commits):
+        # Save the current working directory and switch to the log folder
+        cwd = os.getcwd()
+        os.chdir(self.log_folder)
+
+        # Look for the commit_list file
+        try:
+            f = open( "commit_list", "r")
+            try:
+                commitsLines = f.readlines()
+            finally:
+                f.close()
+        except IOError:
+            if not silentMode:
+                sys.stderr.write("The log folder '{0}' does not contain a commit_list file\n".format(self.log_folder))
+            return False
+
+        # Read all the commits' labels
+        labels = readCommitLabels()
+
+        # Check that there are commits
+        if (len(commitsLines) == 0):
+            if not silentMode:
+                sys.stderr.write("The commit_list file is empty\n")
+            return False
+
+        # Find all the result files and sort them by sha1
+        files_list = os.listdir()
+        testFiles = dict()
+        commit_bench_file_re = re.compile(r'^(.+)_(bench|unit)_[^\.]+(.metrics_.+)?$')
+        for f in files_list:
+            if os.path.isdir(f):
+                continue
+            m = commit_bench_file_re.match(f)
+            if m is not None:
+                sha1 = m.groups()[0]
+                if sha1 not in testFiles:
+                    testFiles[sha1] = []
+                testFiles[sha1].append((f, m.groups()[1]))
+        files_list = None
+
+        # Gather all the information from the commits
+        if not silentMode:
+            print ("Reading the results for {0} commits".format(len(commitsLines)))
+        commits_txt = ""
+        table_entries_txt = ""
+        for commitLine in commitsLines:
+            full_name = commitLine.strip(' \t\n\r')
+            sha1 = commitLine.split()[0]
+            compile_log = sha1 + "_compile_log"
+            patch = sha1 + ".patch"
+            label = labels.get(sha1, sha1)
+            if (len(restrict_to_commits) > 0 and sha1 not in restrict_to_commits
+                and label not in restrict_to_commits):
+                continue
+            commit = Commit(sha1, full_name, compile_log, patch, label)
+
+            # Add the commit to the list of commits
+            commit.results = sorted(commit.results, key=lambda res: res.benchmark.full_name)
+            self.commits.append(commit)
+
+            # If there are no results, just continue
+            if sha1 not in testFiles:
+                continue
+
+            # find all the benchmarks
+            for testFile, testType in testFiles[sha1]:
+                # Skip when the file is a run file (finishes by #XX)
+                if re.search(r'#\d+$', testFile) is not None:
+                    continue
+
+                # Skip on unrelated files
+                if "." in testFile:
+                    continue
+
+                # Get the bench name
+                bench_name = testFile[len(commit.sha1) + len(testType) + 2:]
+
+                # Find the right Benchmark or create one if none are found
+                try:
+                    benchmark = next(b for b in self.benchmarks if b.full_name == bench_name)
+                except StopIteration:
+                    benchmark = Benchmark(bench_name)
+                    self.benchmarks.append(benchmark)
+
+                # Create the result object
+                result = BenchResult(commit, benchmark, testFile)
+
+                # Read the data and abort if there is no data
+                result.data, result.unit_str, result.more_is_better = readCsv(testFile)
+                if len(result.data) == 0:
+                    continue
+
+                if result.unit_str is None:
+                    result.unit_str = "FPS"
+
+                result.test_type = testType
+
+                # Check that the result file has the same default v
+                if benchmark.unit_str != result.unit_str:
+                    if benchmark.unit_str != "undefined":
+                        msg = "The unit used by the benchmark '{bench}' changed from '{unit_old}' to '{unit_new}' in commit {commit}"
+                        print(msg.format(bench=bench_name,
+                                        unit_old=benchmark.unit_str,
+                                        unit_new=result.unit_str,
+                                        commit=commit.sha1))
+                    benchmark.unit_str = result.unit_str
+
+                # Look for the runs
+                run_re = re.compile(r'^{testFile}#[0-9]+$'.format(testFile=testFile))
+                runsFiles = [f for f,t in testFiles[sha1] if run_re.search(f)]
+                runsFiles.sort(key=lambda x: '{0:0>100}'.format(x).lower()) # Sort the runs in natural order
+                result.metrics = dict()
+                for runFile in runsFiles:
+                    if testType == "bench":
+                        data, unit, more_is_better = readCsv(runFile)
+                        if len(data) > 0:
+                            # Add the FPS readings of the run
+                            result.runs.append(data)
+                    elif testType == "unit":
+                        result.runs.append(readUnitRun(runFile))
+                    else:
+                        print("WARNING: Ignoring results because the type '{}' is unknown".format(testType))
+                        continue
+
+                    # Add the environment file
+                    envFile = runFile + ".env_dump"
+                    if not os.path.isfile(envFile):
+                        envFile = None
+                    result.env_files.append(envFile)
+
+                    # Look for metrics!
+                    metrics_re = re.compile(r'^{}.metrics_.+$'.format(runFile))
+                    for metric_file in [f for f,t in testFiles[sha1] if metrics_re.search(f)]:
+                        try:
+                            result.add_metrics(metric_file)
+                        except ValueError:
+                            pass
+
+                # Add the result to the commit's results
+                commit.results.append(result)
+                commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
+
+        # Sort the list of benchmarks
+        self.benchmarks = sorted(self.benchmarks, key=lambda bench: bench.full_name)
+
+        # Read the notes before going back to the original folder
+        notes = readNotes()
+
+        # Go back to the original folder
+        os.chdir(cwd)
 
     def find_commit(self, sha1):
         for commit in self.commits:
@@ -1946,163 +2101,7 @@ def readNotes():
         return []
 
 def genPerformanceReport(log_folder, silentMode = False, restrict_to_commits = []):
-    benchmarks = []
-    commits = []
-    labels = dict()
-    notes = []
-
-    # Save the current working directory and switch to the log folder
-    cwd = os.getcwd()
-    os.chdir(log_folder)
-
-    # Look for the commit_list file
-    try:
-        f = open( "commit_list", "r")
-        try:
-            commitsLines = f.readlines()
-        finally:
-            f.close()
-    except IOError:
-        if not silentMode:
-            sys.stderr.write("The log folder '{0}' does not contain a commit_list file\n".format(log_folder))
-        return Report(log_folder, benchmarks, commits, notes)
-
-    # Read all the commits' labels
-    labels = readCommitLabels()
-
-    # Check that there are commits
-    if (len(commitsLines) == 0):
-        if not silentMode:
-            sys.stderr.write("The commit_list file is empty\n")
-        return Report(log_folder, benchmarks, commits, notes)
-
-    # Find all the result files and sort them by sha1
-    files_list = os.listdir()
-    testFiles = dict()
-    commit_bench_file_re = re.compile(r'^(.+)_(bench|unit)_[^\.]+(.metrics_.+)?$')
-    for f in files_list:
-        if os.path.isdir(f):
-            continue
-        m = commit_bench_file_re.match(f)
-        if m is not None:
-            sha1 = m.groups()[0]
-            if sha1 not in testFiles:
-                testFiles[sha1] = []
-            testFiles[sha1].append((f, m.groups()[1]))
-    files_list = None
-
-    # Gather all the information from the commits
-    if not silentMode:
-        print ("Reading the results for {0} commits".format(len(commitsLines)))
-    commits_txt = ""
-    table_entries_txt = ""
-    for commitLine in commitsLines:
-        full_name = commitLine.strip(' \t\n\r')
-        sha1 = commitLine.split()[0]
-        compile_log = sha1 + "_compile_log"
-        patch = sha1 + ".patch"
-        label = labels.get(sha1, sha1)
-        if (len(restrict_to_commits) > 0 and sha1 not in restrict_to_commits
-            and label not in restrict_to_commits):
-            continue
-        commit = Commit(sha1, full_name, compile_log, patch, label)
-
-        # Add the commit to the list of commits
-        commit.results = sorted(commit.results, key=lambda res: res.benchmark.full_name)
-        commits.append(commit)
-
-        # If there are no results, just continue
-        if sha1 not in testFiles:
-            continue
-
-        # find all the benchmarks
-        for testFile, testType in testFiles[sha1]:
-            # Skip when the file is a run file (finishes by #XX)
-            if re.search(r'#\d+$', testFile) is not None:
-                continue
-
-            # Skip on unrelated files
-            if "." in testFile:
-                continue
-
-            # Get the bench name
-            bench_name = testFile[len(commit.sha1) + len(testType) + 2:]
-
-            # Find the right Benchmark or create one if none are found
-            try:
-                benchmark = next(b for b in benchmarks if b.full_name == bench_name)
-            except StopIteration:
-                benchmark = Benchmark(bench_name)
-                benchmarks.append(benchmark)
-
-            # Create the result object
-            result = BenchResult(commit, benchmark, testFile)
-
-            # Read the data and abort if there is no data
-            result.data, result.unit_str, result.more_is_better = readCsv(testFile)
-            if len(result.data) == 0:
-                continue
-
-            if result.unit_str is None:
-                result.unit_str = "FPS"
-
-            result.test_type = testType
-
-            # Check that the result file has the same default v
-            if benchmark.unit_str != result.unit_str:
-                if benchmark.unit_str != "undefined":
-                    msg = "The unit used by the benchmark '{bench}' changed from '{unit_old}' to '{unit_new}' in commit {commit}"
-                    print(msg.format(bench=bench_name,
-                                     unit_old=benchmark.unit_str,
-                                     unit_new=result.unit_str,
-                                     commit=commit.sha1))
-                benchmark.unit_str = result.unit_str
-
-            # Look for the runs
-            run_re = re.compile(r'^{testFile}#[0-9]+$'.format(testFile=testFile))
-            runsFiles = [f for f,t in testFiles[sha1] if run_re.search(f)]
-            runsFiles.sort(key=lambda x: '{0:0>100}'.format(x).lower()) # Sort the runs in natural order
-            result.metrics = dict()
-            for runFile in runsFiles:
-                if testType == "bench":
-                    data, unit, more_is_better = readCsv(runFile)
-                    if len(data) > 0:
-                        # Add the FPS readings of the run
-                        result.runs.append(data)
-                elif testType == "unit":
-                    result.runs.append(readUnitRun(runFile))
-                else:
-                    print("WARNING: Ignoring results because the type '{}' is unknown".format(testType))
-                    continue
-
-                # Add the environment file
-                envFile = runFile + ".env_dump"
-                if not os.path.isfile(envFile):
-                    envFile = None
-                result.env_files.append(envFile)
-
-                # Look for metrics!
-                metrics_re = re.compile(r'^{}.metrics_.+$'.format(runFile))
-                for metric_file in [f for f,t in testFiles[sha1] if metrics_re.search(f)]:
-                    try:
-                        result.add_metrics(metric_file)
-                    except ValueError:
-                        pass
-
-            # Add the result to the commit's results
-            commit.results.append(result)
-            commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
-
-    # Sort the list of benchmarks
-    benchmarks = sorted(benchmarks, key=lambda bench: bench.full_name)
-
-    # Read the notes before going back to the original folder
-    notes = readNotes()
-
-    # Go back to the original folder
-    os.chdir(cwd)
-
-    return Report(log_folder, benchmarks, commits, notes)
+    return Report(log_folder, silentMode, restrict_to_commits)
 
 def getPerformanceResultsCommitBenchmark(commit, benchmark):
     for result in commit.results:
