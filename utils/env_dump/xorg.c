@@ -63,7 +63,7 @@ _env_dump_xlib_compositor(Display *dpy, int screen)
 	stringType = orig_xinternatom(dpy, "UTF8_STRING", True);
 
 	if (wmCheckAtom == None || wmName == None || stringType == None)
-		return strdup("UNKNOWN");
+		goto error;
 
 	root = RootWindow(dpy, screen);
 	if (!(orig_xgetwindowproperty(dpy, root, wmCheckAtom, 0, 1024, False,
@@ -76,13 +76,14 @@ _env_dump_xlib_compositor(Display *dpy, int screen)
 		{
 			if (name != NULL)
 				result = strdup((char *)name);
-			else
-				result = "UNKNOWN";
 			orig_xfree(name);
 		}
 	}
 
-	return result;
+	if (result)
+        return result;
+error:
+	return strdup("UNKNOWN");
 }
 
 Display *
