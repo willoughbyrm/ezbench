@@ -903,7 +903,7 @@ class SmartEzbench:
         for commit in report.commits:
             for result in commit.results:
                 self.__log(Criticality.DD,
-                           "Found {count} runs for benchmark {benchmark} using commit {commit}".format(count=len(result.data),
+                           "Found {count} runs for benchmark {benchmark} using commit {commit}".format(count=len(result.result()),
                                                                                                        commit=commit.sha1,
                                                                                                        benchmark=result.benchmark.full_name))
 
@@ -913,7 +913,7 @@ class SmartEzbench:
                             full_name = Benchmark.partial_name(result.benchmark.full_name, [test])
                             self.__remove_task_from_tasktree__(task_tree, commit, full_name, 10^5) # FIXME: Read the actual round count?
                 else:
-                    self.__remove_task_from_tasktree__(task_tree, commit, result.benchmark.full_name, len(result.data))
+                    self.__remove_task_from_tasktree__(task_tree, commit, result.benchmark.full_name, len(result.result()))
 
         # Delete the tests on commits that do not compile
         for commit in report.commits:
@@ -1063,12 +1063,13 @@ class SmartEzbench:
         self._report_cached = r
 
         # Create a list of all the unstable tests
+        # TODO: Check that from the list of events instead of re-doing the work!
         unstable_unittests = dict()
         for e in r.events:
             if type(e) is EventUnitResultUnstable:
                 if e.commit.sha1 not in unstable_unittests:
                     unstable_unittests[e.commit.sha1] = set()
-                unstable_unittests[e.commit.sha1] |= set([str(e.bench_sub_test)])
+                unstable_unittests[e.result.version.sha1] |= set([str(e.result.subtest_fullname())])
         self.__log(Criticality.DD, "Unstable tests: {}".format(str(unstable_unittests)))
 
         # Check all events
@@ -1115,10 +1116,10 @@ class SmartEzbench:
                     continue
 
                 # ignore commits which have a big variance
-                result_new = r.find_result(e.commit_range.new, e.benchmark)
+                result_new = r.find_result(e.commit_range.new, e.benchmark).result()
                 if result_new.margin() > max_variance:
                     continue
-                result_old = r.find_result(e.commit_range.old, e.benchmark)
+                result_old = r.find_result(e.commit_range.old, e.benchmark).result()
                 if result_old.margin() > max_variance:
                     continue
 
@@ -1137,21 +1138,21 @@ class SmartEzbench:
                 event_prio = 0.75
 
                 bench_name_to_run = benchmark.full_name
-                runs = (len(result_old.data) + len(result_new.data)) / 2
+                runs = (len(result_old) + len(result_new)) / 2
             elif type(e) is EventInsufficientSignificance:
-                commit_sha1 = e.result.commit.sha1
-                benchmark = e.result.benchmark
-                missing_runs = max(2, e.wanted_n() - len(e.result.data)) # Schedule at least 2 more runs
-                severity = min(missing_runs / len(e.result.data), 1)
+                commit_sha1 = e.result.version.sha1
+                benchmark = e.result.test
+                missing_runs = max(2, e.wanted_n() - len(e.result)) # Schedule at least 2 more runs
+                severity = min(missing_runs / len(e.result), 1)
                 event_prio = 1
 
                 bench_name_to_run = benchmark.full_name
                 additional_runs = min(20, missing_runs) # cap the maximum amount of runs to play nice
 
                 # Make sure we do not schedule more than the maximum amount of run
-                runs = len(e.result.data) + additional_runs
+                runs = len(e.result) + additional_runs
                 if runs > max_run_count:
-                    runs = max_run_count - len(e.result.data)
+                    runs = max_run_count - len(e.result)
                     if runs == 0:
                         continue
             elif type(e) is EventUnitResultChange:
@@ -1211,7 +1212,7 @@ class SmartEzbench:
         # If we are using the throttle mode, only schedule the commit with the
         # biggest score to speed up bisecting of the most important issues
         tasks_sorted = sorted(tasks, key=lambda t: t[0])
-        scheduled_commits = 0
+        scheduled_commits = added = 0
         self.__reload_state(keep_lock=True)
         while len(tasks_sorted) > 0 and scheduled_commits < commit_schedule_max:
             commit = tasks_sorted[-1][1]
@@ -1267,47 +1268,9 @@ class Benchmark:
             name += "]"
         return name
 
-class BenchSubTest:
-    def __init__(self, benchmark, subtest):
-        self.benchmark = benchmark
-        self.subtest = subtest
-
-    def __str__(self):
-        return Benchmark.partial_name(self.benchmark.full_name, [self.subtest])
-
-class Metric:
-    def __init__(self, name, unit, data, result, data_raw_file):
-        self.name = name
-        self.unit = unit
+class ListStats:
+    def __init__(self, data):
         self.data = data
-        self.result = result
-        self.data_raw_file = data_raw_file
-
-        self._cache_result = None
-
-    def average(self):
-        if self._cache_result is None:
-            s = sum(row[1] for row in self.data)
-            self._cache_result = s / len(self.data)
-        return self._cache_result
-
-    def exec_time(self):
-        if len(self.data) > 0:
-            return self.data[-1][0]
-        else:
-            return 0
-
-class TestResult:
-    def __init__(self, commit, benchmark, data_raw_file):
-        self.commit = commit
-        self.benchmark = benchmark
-        self.data_raw_file = data_raw_file
-        self.data = []
-        self.runs = []
-        self.metrics = dict()
-        self.unit_results = dict()
-        self.env_files = []
-        self.unit_str = None
 
         # cached data
         self._cache_result = None
@@ -1315,24 +1278,11 @@ class TestResult:
         self._cache_std = None
 
     def invalidate_cache(self):
+        """ Trash the cache, necessary if you manually update the data (BAD!) """
+
         self._cache_result = None
         self._cache_mean = None
         self._cache_std = None
-
-    def result(self, metric = "default"):
-        if self._cache_result is None:
-            self._cache_result = dict()
-        if metric not in self._cache_result:
-            if metric == "default":
-                self._cache_result[metric] = (sum(self.data) / len(self.data), self.unit_str)
-            else:
-                if metric not in self.metrics:
-                    raise ValueError('Unknown metric name')
-                s = 0
-                for m in self.metrics[metric]:
-                    s += m.average()
-                self._cache_result[metric] = (s / len(self.metrics[metric]), m.unit)
-        return self._cache_result[metric]
 
     def __samples_needed__(self, sigma, margin, confidence=0.95):
         # TODO: Find the function in scipy to get these values
@@ -1349,6 +1299,9 @@ class TestResult:
             if len(self.data) > 1:
                 self._cache_mean, var, self._cache_std = stats.bayes_mvs(array(self.data),
                                                                          alpha=0.95)
+                if math.isnan(self._cache_mean[0]):
+                    self._cache_mean = (self.data[0], (self.data[0], self.data[0]))
+                    self._cache_std = (0, (0, 0))
             else:
                 if len(self.data) == 0:
                     value = 0
@@ -1358,6 +1311,8 @@ class TestResult:
                 self._cache_std = (float("inf"), (float("inf"), float("inf")))
 
     def margin(self):
+        """ Computes the margin of error for the sample set """
+
         self.__compute_stats__()
         if self._cache_mean[0] > 0:
             return (self._cache_mean[1][1] - self._cache_mean[1][0]) / 2 / self._cache_mean[0]
@@ -1366,6 +1321,19 @@ class TestResult:
 
     # wanted_margin is a number between 0 and 1
     def confidence_margin(self, wanted_margin = None, confidence=0.95):
+        """
+        Computes the confidence margin of error and how many samples would be
+        needed to guarantee that mean of the data would be inside the wanted_margin.
+
+        Args:
+            wanted_margin: A float that represents how much variance you accept. For example, 0.025 would mean the accepted variance is 2.5%
+            confidence: The wanted confidence level
+
+        Returns:
+            the current margin of error
+            the number of samples needed to reach the wanted confidence
+        """
+
         data = array(self.data)
         if len(data) < 2 or data.var() == 0:
             return 0, 2
@@ -1384,7 +1352,123 @@ class TestResult:
 
         return margin, wanted_samples
 
-    def add_metrics(self, metric_file):
+    def mean(self):
+        """ Computes the mean of the data set """
+
+        self.__compute_stats__()
+        return self._cache_mean[0]
+
+    def compare(self, distrib_b, equal_var=True):
+        """
+        Compare the current sample distribution to distrib_b's
+
+        Args:
+            distrib_b: the distribution to compare to
+            equal_var: f True (default), perform a standard independent 2 sample test that assumes equal population variances [R263]. If False, perform Welch’s t-test, which does not assume equal population variance [R264].
+
+        Returns:
+            the difference of the means (self - b)
+            the confidence of them being from the same normal distribution
+        """
+
+        t, p = stats.ttest_ind(distrib_b.data, self.data,
+                               equal_var = equal_var)
+        if distrib_b.mean() > 0:
+            diff = abs(self.mean() - distrib_b.mean()) / distrib_b.mean()
+        else:
+            diff = float('inf')
+
+        return diff, 1 - p
+
+    def __len__(self):
+        return len(self.data)
+
+class BenchSubTestType(Enum):
+    SUBTEST_FLOAT = 0
+    SUBTEST_STRING = 1
+    SUBTEST_IMAGE = 2
+    METRIC = 3
+
+class SubTestBase:
+    def __init__(self, name, subtestType, averageValue, unit = None, data_raw_file = None):
+        self.name = name
+        self.subtest_type = subtestType
+        self.value = averageValue
+        self.unit = unit
+        self.data_raw_file = data_raw_file
+
+class SubTestString(SubTestBase):
+    def __init__(self, name, value, data_raw_file = None):
+        super().__init__(name, BenchSubTestType.SUBTEST_STRING, value, None, data_raw_file)
+
+class SubTestFloat(SubTestBase):
+    def __init__(self, name, unit, samples, data_raw_file = None):
+        self.samples = ListStats(samples)
+
+        super().__init__(name, BenchSubTestType.SUBTEST_FLOAT, self.samples.mean(), unit, data_raw_file)
+
+class Metric(SubTestFloat):
+    def __init__(self, name, unit, samples, timestamps = None, data_raw_file = None):
+        super().__init__(name, unit, samples, data_raw_file)
+        self.subtest_type = BenchSubTestType.METRIC
+        self.timestamps = timestamps
+
+    def exec_time(self):
+        """
+        Returns the difference between the last and the first timestamp or 0 if
+        there are no timestamps.
+        """
+        if self.timestamps is not None and len(self.timestamps) > 0:
+            return self.timestamps[-1]
+        else:
+            return 0
+
+class TestRun:
+    def __init__(self, testResult, testType, runFile, metricsFiles, mainValueType = None, mainValue = None):
+        self.test_result = testResult
+        self.run_file = runFile
+        self.main_value_type = mainValueType
+        self.main_value = mainValue
+
+        self._results = dict()
+
+        # Add the environment file
+        self.env_file = runFile + ".env_dump"
+        if not os.path.isfile(self.env_file):
+            self.env_file = None
+
+        if testType == "bench":
+            # There are no subtests here
+            data, unit, more_is_better = readCsv(runFile)
+            if len(data) > 0:
+                result = SubTestFloat("samples", testResult.unit_str, data, runFile)
+                self.__add_result__(result)
+        elif testType == "unit":
+            unit_tests = readUnitRun(runFile)
+            for subtest in unit_tests:
+                result = SubTestString(subtest, unit_tests[subtest], runFile)
+                self.__add_result__(result)
+        else:
+            raise ValueError("Ignoring results because the type '{}' is unknown".format(testType))
+
+        for f in metricsFiles:
+            self.__add_metrics__(f)
+
+    def __add_result__(self, subtest):
+        if subtest.subtest_type == BenchSubTestType.METRIC:
+            key = "metric_{}".format(subtest.name)
+        else:
+            key = subtest.name
+
+        # Verify that the subtest does not already exist
+        if key in self._results:
+            msg = "Raw data file '{}' tries to add an already-existing result '{}' (found in '{}')"
+            msg = msg.format(subtest.data_raw_file, key, self._results[key].data_raw_file)
+            raise ValueError(msg)
+
+        self._results[key] = subtest
+
+    def __add_metrics__(self, metric_file):
         values = dict()
         with open(metric_file, 'rt') as f:
 
@@ -1414,7 +1498,7 @@ class TestResult:
                         values[field].append(float(row[field]))
             except csv.Error as e:
                 sys.stderr.write('file %s, line %d: %s\n' % (filepath, reader.line_num, e))
-                return [], "none"
+                return
 
         # Find the time values and store them aside after converting them to seconds
         time_unit_re = re.compile(r'^time \((.+)\)$')
@@ -1450,14 +1534,13 @@ class TestResult:
             if metric_name.lower() == "time":
                 continue
 
-            # Make sure that the metric does not already exist for this result
-            if metric_name not in self.metrics:
-                self.metrics[metric_name] = list()
-
-            metric = Metric(metric_name, unit, [], self, metric_file)
+            vals = list()
+            timestamps = list()
             for v in range(0, len(values[field])):
-                metric.data.append((time[v] - time[0], values[field][v]))
-            self.metrics[metric_name].append(metric)
+                vals.append(values[field][v])
+                timestamps.append(time[v] - time[0])
+            metric = Metric(metric_name, unit, vals, timestamps, metric_file)
+            self.__add_result__(metric)
 
             # Try to add more metrics by combining them
             if unit == "W" or unit == "J":
@@ -1465,23 +1548,253 @@ class TestResult:
                 if unit == "W":
                     if metric.exec_time() > 0:
                         energy_name = metric_name + ":energy"
-                        power_value =  metric.average()
+                        power_value =  metric.samples.mean()
                         value = power_value * metric.exec_time()
-                        energy_metric = Metric(energy_name, "J", [(metric.exec_time(), value)], self, metric_file)
-                        self.metrics[energy_name] = [energy_metric]
+                        energy_metric = Metric(energy_name, "J", [value], [metric.exec_time()], metric_file)
+                        self.__add_result__(energy_metric)
                 elif unit == "J":
                     if metric.exec_time() > 0:
                         energy_name = metric_name + ":power"
-                        power_value = metric.average() / metric.exec_time()
-                        power_metric = Metric(energy_name, "W", [(metric.exec_time(), power_value)], self, metric_file)
-                        self.metrics[energy_name] = [power_metric]
+                        power_value = metric.samples.mean() / metric.exec_time()
+                        power_metric = Metric(energy_name, "W", [power_value], [metric.exec_time()], metric_file)
+                        self.__add_result__(power_metric)
 
-                if power_value is not None and self.unit_str == "FPS":
+                if power_value is not None and self.main_value_type == "FPS":
                     efficiency_name = metric_name + ":efficiency"
-                    value = self.result()[0] / power_value
-                    unit = "{}/W".format(self.unit_str)
-                    efficiency_metric = Metric(efficiency_name, unit, [(metric.exec_time(), value)], self, metric_file)
-                    self.metrics[efficiency_name] = [efficiency_metric]
+                    value = self.main_value / power_value
+                    unit = "{}/W".format(self.main_value_type)
+                    efficiency_metric = Metric(efficiency_name, unit, [value], [metric.exec_time()], metric_file)
+                    self.__add_result__(efficiency_metric)
+
+    def result(self, key = None):
+        """ Returns the result associated to the key or None if it does not exist """
+        if key is None:
+            return SubTestFloat(None, self.main_value_type, [self.main_value], self.test_result.test_file)
+        if key in self._results:
+            return self._results[key]
+        else:
+            return None
+
+    def results(self, restrict_to_type = None):
+        """
+        Returns a set of all the available keys for results (to be queried
+        individually using the result() method). You may select only one type
+        of results by using the restrict_to_type parameter.
+
+        Args:
+            restrict_to_type: A BenchSubTestType to only list the results of a certain type
+
+        """
+        if restrict_to_type is None:
+            return self._results.keys()
+        else:
+            return set([x for x in self._results if self._results[x].subtest_type == restrict_to_type])
+
+
+class SubTestResult:
+    def __init__(self, version, test, key, runs):
+        self.version = version
+        self.test = test
+        self.key = key
+        self.runs = runs
+
+        self.value_type = None
+        self.unit = None
+        self.results = []
+
+        for run in runs:
+            run_result = run.result(key)
+            if run_result is None:
+                continue
+            if self.value_type is None:
+                self.value_type = run_result.subtest_type
+            elif self.value_type != run_result.subtest_type:
+                msg ="Tried to add a result (run file '{}') for the subtest '{}' with type {} to list only containing the type {}"
+                msg = msg.format(run_result.data_raw_file, subtest,
+                                 run_result.subtest_type, self.value_type)
+                raise ValueError(msg)
+            if self.unit is None:
+                self.unit = run_result.unit
+            elif self.unit != run_result.unit:
+                msg ="Tried to add a result (run file '{}') for the subtest '{}' with unit '{}' to list only containing the unit '{}'"
+                msg = msg.format(run_result.data_raw_file, subtest,
+                                 run_result.unit, self.unit)
+                raise ValueError(msg)
+
+            # Do not add empty samples
+            if (run_result.value is None or
+                ((self.value_type == BenchSubTestType.SUBTEST_FLOAT or
+                     self.value_type == BenchSubTestType.METRIC)
+                and math.isnan(run_result.value))):
+                continue
+            self.results.append((run, run_result.value))
+
+        self._cache_list = None
+        self._cache_list_stats = None
+
+    def __len__(self):
+        return len(self.to_list())
+
+    def __getitem__(self, key):
+        return self.to_list()[key]
+
+    def to_list(self):
+        """ Returns the list of all the mean values for every run """
+
+        if self._cache_list is None:
+            self._cache_list = [x[1] for x in self.results if x[1] is not None]
+        return self._cache_list
+
+    def to_set(self):
+        """ Returns a set of all the values found at every run """
+
+        return set(self.to_list())
+
+    def to_liststat(self):
+        """ Convenience method that returns a ListStats(self.to_list()) object """
+
+        if self._cache_list_stats is None:
+            if (self.value_type == BenchSubTestType.SUBTEST_FLOAT or
+                self.value_type == BenchSubTestType.METRIC):
+                self._cache_list_stats = ListStats(self.to_list())
+            else:
+                self._cache_list_stats = ListStats([])
+        return self._cache_list_stats
+
+    def compare(self, old_subtestresult):
+        """
+        Compare the current sample distribution to old_subtestresult's
+
+        Args:
+            old_subtestresult: the subrest to compare to
+            equal_var: f True (default), perform a standard independent 2 sample test that assumes equal population variances [R263]. If False, perform Welch’s t-test, which does not assume equal population variance [R264].
+
+        Returns:
+            the difference of the means (self - b)
+            the confidence of them being from the same normal distribution
+
+        WARNING: Does not work when the type is SUBTEST_STRING
+        """
+
+        return self.to_liststat().compare(old_subtestresult.to_liststat())
+
+    def mean(self):
+        """
+        Returns the mean of the values. Only works on numbers outputs.
+
+        WARNING: Does not work when the type is SUBTEST_STRING
+        """
+        return self.to_liststat().mean()
+
+    def margin(self):
+        """
+        Computes the margin of error for the sample set.
+
+        WARNING: Does not work when the type is SUBTEST_STRING
+        """
+        return self.to_liststat().margin()
+
+    def confidence_margin(self, wanted_margin = None, confidence=0.95):
+        """
+        Computes the confidence margin of error and how many samples would be
+        needed to guarantee that mean of the data would be inside the wanted_margin.
+
+        Args:
+            wanted_margin: A float that represents how much variance you accept. For example, 0.025 would mean the accepted variance is 2.5%
+            confidence: The wanted confidence level
+
+        Returns:
+            the current margin of error
+            the number of samples needed to reach the wanted confidence
+
+        WARNING: Does not work when the type is SUBTEST_STRING
+        """
+
+        liststat = self.to_liststat()
+        return self.to_liststat().confidence_margin(wanted_margin, confidence)
+
+    def subtest_fullname(self):
+        """
+        Returns the name that should be used to reproduce this result.
+
+        WARNING: Does not work when the type is SUBTEST_STRING
+        """
+        if self.value_type != BenchSubTestType.METRIC:
+            return Benchmark.partial_name(self.test.full_name, [self.key])
+        else:
+            return None
+
+class TestResult:
+    def __init__(self, commit, benchmark, testType, testFile, runFiles, metricsFiles):
+        self.commit = commit
+        self.benchmark = benchmark
+        self.test_file = testFile
+
+        self.runs = []
+        self.test_type = testType
+        self.more_is_better = True
+        self.unit_str = None
+
+        self._results = set()
+        self._cache_result = None
+
+        self.__parse_results__(testType, testFile, runFiles, metricsFiles)
+
+    def __parse_results__(self, testType, testFile, runFiles, metricsFiles):
+        # Read the data and abort if there is no data
+        data, unit_str, self.more_is_better = readCsv(testFile)
+        if len(data) == 0:
+            raise ValueError("The TestResult {} does not contain any runs".format(testFile))
+
+        if unit_str is None:
+            unit_str = "FPS"
+        self.unit_str = unit_str
+
+        # Check that we have the same unit as the benchmark
+        if self.benchmark.unit_str != self.unit_str:
+            if self.benchmark.unit_str != "undefined":
+                msg = "The unit used by the benchmark '{bench}' changed from '{unit_old}' to '{unit_new}' in commit {commit}"
+                print(msg.format(bench=bench_name,
+                                unit_old=benchmark.unit_str,
+                                unit_new=self.unit_str,
+                                commit=commit.sha1))
+            self.benchmark.unit_str = unit_str
+
+        for i in range(0, len(runFiles)):
+            run = TestRun(self, testType, runFiles[i], metricsFiles[runFiles[i]], unit_str, data[i])
+            self._results |= run.results()
+            self.runs.append(run)
+
+
+    def result(self, key = None):
+        """ Returns the result associated to the key or None if it does not exist """
+
+        if self._cache_result is None:
+            self._cache_result = dict()
+        if key not in self._cache_result:
+            if len(self.runs) == 0:
+                raise ValueError('Cannot get the results when there are no runs ({})'.format(self.test_file))
+            self._cache_result[key] = SubTestResult(self.commit, self.benchmark, key, self.runs)
+        return self._cache_result[key]
+
+    def results(self, restrict_to_type = None):
+        """
+        Returns a set of all the available keys for results (to be queried
+        individually using the result() method). You may select only one type
+        of results by using the restrict_to_type parameter.
+
+        Args:
+            restrict_to_type: A BenchSubTestType to only list the results of a certain type
+
+        """
+
+        if restrict_to_type is None:
+            return self._results
+        else:
+            res = set()
+            for run in self.runs:
+                res |= run.results(restrict_to_type)
+            return res
 
 
 class Commit:
@@ -1575,6 +1888,10 @@ class Commit:
                 self.compil_exit_code.value <= EzbenchExitCode.DEPLOYMENT_ERROR.value)
 
     def geom_mean(self):
+        """ Returns the geometric mean of the average performance of all the
+        tests (default key).
+        """
+
         if self.geom_mean_cache >= 0:
             return self.geom_mean_cache
 
@@ -1582,8 +1899,9 @@ class Commit:
         s = 1
         n = 0
         for result in self.results:
-            if len(result.data) > 0:
-                s *= array(result.data).mean()
+            testresults = result.result()
+            if len(testresults) > 0:
+                s *= testresults.mean()
                 n = n + 1
         if n > 0:
             value = s ** (1 / n)
@@ -1721,7 +2039,7 @@ class EventInsufficientSignificance:
     def __str__(self):
         margin, wanted_n = self.result.confidence_margin(self.wanted_margin)
         msg = "Benchmark {} on commit {} requires more runs to reach the wanted margin ({:.2f}% vs {:.2f}%), proposes n = {}."
-        return msg.format(self.result.benchmark.full_name, self.result.commit.sha1,
+        return msg.format(self.result.test.full_name, self.result.version.sha1,
                           margin * 100, self.wanted_margin * 100, wanted_n)
 
 class EventUnitResultChange:
@@ -1737,16 +2055,13 @@ class EventUnitResultChange:
                           self.old_status, self.new_status)
 
 class EventUnitResultUnstable:
-    def __init__(self, bench_sub_test, commit, prev_status, new_status):
-        self.bench_sub_test = bench_sub_test
-        self.commit = commit
-        self.prev_status = prev_status
-        self.new_status = new_status
+    def __init__(self, result):
+        self.result = result
 
     def __str__(self):
-        msg = "Unstable result on commit {} for {} (from {} to {})"
-        return msg.format(self.commit.sha1, self.bench_sub_test,
-                          self.prev_status, self.new_status)
+        msg = "Unstable result on version {} for {} (got {})"
+        return msg.format(self.result.version.sha1, self.result.subtest_fullname(),
+                          self.result.to_set())
 
 class Report:
     def __init__(self, log_folder, silentMode = False, restrict_to_commits = []):
@@ -1757,7 +2072,6 @@ class Report:
         self.commits = list()
         self.notes = list()
         self.events = list()
-        self.test_type = "unknown"
 
         self.__parse_report__(silentMode, restrict_to_commits)
 
@@ -1816,7 +2130,7 @@ class Report:
         # Find all the result files and sort them by sha1
         files_list = os.listdir()
         testFiles = dict()
-        commit_bench_file_re = re.compile(r'^(.+)_(bench|unit)_[^\.]+(.metrics_.+)?$')
+        commit_bench_file_re = re.compile(r'^(.+)_(bench|unit)_[^\.]+(.metrics_[^\.]+)?$')
         for f in files_list:
             if os.path.isdir(f):
                 continue
@@ -1871,63 +2185,28 @@ class Report:
                     benchmark = Benchmark(bench_name)
                     self.benchmarks.append(benchmark)
 
-                # Create the result object
-                result = TestResult(commit, benchmark, testFile)
-
-                # Read the data and abort if there is no data
-                result.data, result.unit_str, result.more_is_better = readCsv(testFile)
-                if len(result.data) == 0:
-                    continue
-
-                if result.unit_str is None:
-                    result.unit_str = "FPS"
-
-                result.test_type = testType
-
-                # Check that the result file has the same default v
-                if benchmark.unit_str != result.unit_str:
-                    if benchmark.unit_str != "undefined":
-                        msg = "The unit used by the benchmark '{bench}' changed from '{unit_old}' to '{unit_new}' in commit {commit}"
-                        print(msg.format(bench=bench_name,
-                                        unit_old=benchmark.unit_str,
-                                        unit_new=result.unit_str,
-                                        commit=commit.sha1))
-                    benchmark.unit_str = result.unit_str
-
                 # Look for the runs
                 run_re = re.compile(r'^{testFile}#[0-9]+$'.format(testFile=testFile))
                 runsFiles = [f for f,t in testFiles[sha1] if run_re.search(f)]
                 runsFiles.sort(key=lambda x: '{0:0>100}'.format(x).lower()) # Sort the runs in natural order
-                result.metrics = dict()
+
+                # Look for metrics!
+                metricsFiles = dict()
                 for runFile in runsFiles:
-                    if testType == "bench":
-                        data, unit, more_is_better = readCsv(runFile)
-                        if len(data) > 0:
-                            # Add the FPS readings of the run
-                            result.runs.append(data)
-                    elif testType == "unit":
-                        result.runs.append(readUnitRun(runFile))
-                    else:
-                        print("WARNING: Ignoring results because the type '{}' is unknown".format(testType))
-                        continue
-
-                    # Add the environment file
-                    envFile = runFile + ".env_dump"
-                    if not os.path.isfile(envFile):
-                        envFile = None
-                    result.env_files.append(envFile)
-
-                    # Look for metrics!
+                    metricsFiles[runFile] = list()
                     metrics_re = re.compile(r'^{}.metrics_.+$'.format(runFile))
                     for metric_file in [f for f,t in testFiles[sha1] if metrics_re.search(f)]:
-                        try:
-                            result.add_metrics(metric_file)
-                        except ValueError:
-                            pass
+                        metricsFiles[runFile].append(metric_file)
 
-                # Add the result to the commit's results
-                commit.results.append(result)
-                commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
+                # Create the result object
+                try:
+                    result = TestResult(commit, benchmark, testType, testFile, runsFiles, metricsFiles)
+
+                    # Add the result to the commit's results
+                    commit.results.append(result)
+                    commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
+                except:
+                    pass
 
         # Sort the list of benchmarks
         self.benchmarks = sorted(self.benchmarks, key=lambda bench: bench.full_name)
@@ -1984,78 +2263,69 @@ class Report:
                 self.events.append(EventBuildFixed(build_broken_since, commit_range))
                 build_broken_since = None
 
-            # Look for performance regressions
-            for result in commit.results:
-                bench = result.benchmark.full_name
-                bench_unit = result.benchmark.unit_str
+            # Look for interesting events
+            for testresult in commit.results:
+                for result_key in testresult.results():
+                    result = testresult.result(result_key)
+                    bench = result.test.full_name
+                    bench_unit = result.test.unit_str
 
-                if result.test_type == "bench":
-                    perf = result.result()[0]
+                    if result.value_type == BenchSubTestType.SUBTEST_FLOAT:
+                        if result.margin() > max_variance:
+                            self.events.append(EventInsufficientSignificance(result, max_variance))
 
-                    if result.margin() > max_variance:
-                        self.events.append(EventInsufficientSignificance(result, max_variance))
-
-                    # All the other events require a git history which we do not have, continue...
-                    if len(commits_rev_order) == 0:
-                        continue
-
-                    if bench in bench_prev:
-                        # We got previous perf results, compare!
-                        t, p = stats.ttest_ind(bench_prev[bench].data, result.data, equal_var=True)
-                        perf = result.result()[0]
-                        old_perf = bench_prev[bench].result()[0]
-                        if old_perf > 0:
-                            diff = abs(perf - old_perf) / old_perf
-                        else:
-                            diff = float('inf')
-
-                        # If we are not $perf_diff_confidence sure that this is the
-                        # same normal distribution, say that the performance changed
-                        confidence = 1 - p
-                        if confidence >= perf_diff_confidence and diff >= smallest_perf_change:
-                            commit_range = EventCommitRange(bench_prev[bench].commit, commit)
-                            self.events.append(EventPerfChange(result.benchmark,
-                                                            commit_range,
-                                                            old_perf, perf, confidence))
-                    bench_prev[bench] = result
-                elif result.test_type == "unit":
-                    # Aggregate the results
-                    for run in result.runs:
-                        for test in run:
-                            subtest = BenchSubTest(result.benchmark, test)
-                            if (test in result.unit_results and
-                                result.unit_results[test] != run[test]):
-                                self.events.append(EventUnitResultUnstable(subtest,
-                                                                           commit,
-                                                                           result.unit_results[test],
-                                                                           run[test]))
-                            result.unit_results[test] = run[test]
-
-                    # All the other events require a git history which we do not have, continue...
-                    if len(commits_rev_order) == 0:
-                        continue
-
-                    # Check for differences with the previous commit
-                    for test in result.unit_results:
-                        subtest = BenchSubTest(result.benchmark, test)
-                        if not str(subtest) in unittest_prev:
+                        # All the other events require a git history which we do not have, continue...
+                        if len(commits_rev_order) == 0:
                             continue
 
-                        before = unittest_prev[str(subtest)][2]
-                        after = result.unit_results[test]
-                        if before == after:
+                        if bench in bench_prev:
+                            # We got previous perf results, compare!
+                            old_perf = bench_prev[bench]
+                            diff, confidence = result.compare(old_perf)
+
+                            # If we are not $perf_diff_confidence sure that this is the
+                            # same normal distribution, say that the performance changed
+                            if confidence >= perf_diff_confidence and diff >= smallest_perf_change:
+                                commit_range = EventCommitRange(bench_prev[bench].version, commit)
+                                self.events.append(EventPerfChange(result.test,
+                                                                commit_range,
+                                                                old_perf.mean(),
+                                                                result.mean(),
+                                                                confidence))
+                        bench_prev[bench] = result
+                    elif result.value_type == BenchSubTestType.SUBTEST_STRING:
+                        subtest_name = result.subtest_fullname()
+
+                        # Verify that all the samples are the same
+                        if len(result.to_set()) > 1:
+                            self.events.append(EventUnitResultUnstable(result))
+
+                            # Reset the state of the test and continue
+                            unittest_prev[subtest_name] = None
                             continue
 
-                        subtest = BenchSubTest(result.benchmark, test)
-                        commit_range = EventCommitRange(unittest_prev[str(subtest)][1], commit)
-                        self.events.append(EventUnitResultChange(subtest, commit_range, before, after))
+                        # All the other events require a git history, so skip
+                        # them if we do not have it!
+                        if len(commits_rev_order) == 0:
+                            continue
 
-                    # Add all the results to the prev
-                    for test in result.unit_results:
-                        subtest = BenchSubTest(result.benchmark, test)
-                        unittest_prev[str(subtest)] = (subtest, commit, result.unit_results[test])
-                else:
-                    print("WARNING: enhance_report: unknown test type {}".format(result.test_type))
+                        # Check for differences with the previous commit
+                        # NOTE: unittest_prev and result now can only contain one
+                        # element due to the test above
+                        if subtest_name in unittest_prev:
+                            before = unittest_prev[subtest_name]
+                            if before[0] != result[0]:
+                                commit_range = EventCommitRange(unittest_prev[subtest_name].version, commit)
+                                self.events.append(EventUnitResultChange(subtest_name, commit_range, before[0], result[0]))
+
+                        unittest_prev[subtest_name] = result
+
+                    elif result.value_type == BenchSubTestType.METRIC:
+                        # Nothing to do for now, until we start bisecting
+                        # power.
+                        pass
+                    else:
+                        print("WARNING: enhance_report: unknown result type {}".format(result.value_type))
 
             commit_prev = commit
 

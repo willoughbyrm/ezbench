@@ -28,6 +28,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 from mako.template import Template
+from mako import exceptions
 import collections
 import sys
 import os
@@ -44,15 +45,16 @@ html_name="index.html"
 
 def __env_add_result__(db, human_envs, report, commit, result):
 	if result.benchmark.full_name not in human_envs:
-		for envfile in result.env_files:
+		for run in result.runs:
+			envfile = run.env_file
 			if envfile is not None:
 				fullpath = report.log_folder + "/" + envfile
 				human_envs[result.benchmark.full_name] = EnvDumpReport(fullpath, True)
 	if result.benchmark.full_name not in db['env_sets']:
 		db['env_sets'][result.benchmark.full_name] = list()
-	for e in range(0, len(result.env_files)):
+	for e in range(0, len(result.runs)):
 		# Create the per-run information
-		envfile = result.env_files[e]
+		envfile = result.runs[e].env_file
 		if envfile is None:
 			continue
 
@@ -112,7 +114,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 		db['reference_name'] = "{} ({})".format(reference_report.name, reference_report.commits[-1].label)
 		db['reference'] = reference_report
 		for result in reference_report.commits[-1].results:
-			average_raw = result.result()[0]
+			average_raw = result.result().mean()
 			average = convert_unit(average_raw, result.unit_str, output_unit)
 			average = float("{0:.2f}".format(average))
 			average_raw = float("{0:.2f}".format(average_raw))
@@ -173,15 +175,16 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 			for result in commit.results:
 				if not result.benchmark.full_name in db["benchmarks"]:
 					db["benchmarks"].append(result.benchmark.full_name)
-					db["metrics"][result.benchmark.full_name] = ['default']
+					db["metrics"][result.benchmark.full_name] = []
 				db["commits"][commit.label]['reports'][report.name][result.benchmark.full_name] = result
-				average_raw = result.result()[0]
+				average_raw = result.result().mean()
 				average = convert_unit(average_raw, result.unit_str, output_unit)
 				score_sum += average
 				count += 1
+
 				result.average_raw = float("{0:.2f}".format(average_raw))
 				result.average = float("{0:.2f}".format(average))
-				result.margin_str = float("{0:.2f}".format(result.margin() * 100))
+				result.margin_str = float("{0:.2f}".format(result.result().margin() * 100))
 
 				# Compare to the target
 				if (not result.benchmark.full_name in db["targets"] or
@@ -193,9 +196,14 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 				                                             result.average)
 
 				# Get the metrics
-				for metric in result.metrics:
+				result.metrics = dict()
+				for metric in result.results(BenchSubTestType.METRIC):
 					if metric not in db["metrics"][result.benchmark.full_name]:
 						db["metrics"][result.benchmark.full_name].append(metric)
+
+					metric_object = result.result(metric)
+					result.metrics[metric] = (metric_object.mean(), metric_object.unit)
+
 
 				# Environment
 				__env_add_result__(db, human_envs, report, commit, result)
@@ -248,7 +256,8 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 
 	<%! import cgi %>
 	<%! import html %>
-	<%! from ezbench import compute_perf_difference %>
+	<%! import ezbench %>
+	<%! from ezbench import compute_perf_difference, BenchSubTestType %>
 
 	<html xmlns="http://www.w3.org/1999/xhtml">
 		<head>
@@ -475,7 +484,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 		result = db["commits"][commit]['reports'][report][benchmark]
 		diff_target = "{0:.2f}".format(result.diff_target)
 	%>\\
-	, ${diff_target}, "${tooltip_commit_table(commit)}<h4>Perf</h4><table><tr><td><b>Benchmark</b></td><td>${benchmark}</td></tr><tr><td><b>Target</b></td><td>${db['targets'][benchmark]} ${output_unit} (${diff_target}%)</td></tr><tr><td><b>Raw value</b></td><td>${result.average_raw} ${result.unit_str} +/- ${result.margin_str}% (n=${len(result.data)})</td></tr><tr><td><b>Converted value</b></td><td>${result.average} ${output_unit} +/- ${result.margin_str}% (n=${len(result.data)})</td></tr></table><br/>"\\
+	, ${diff_target}, "${tooltip_commit_table(commit)}<h4>Perf</h4><table><tr><td><b>Benchmark</b></td><td>${benchmark}</td></tr><tr><td><b>Target</b></td><td>${db['targets'][benchmark]} ${output_unit} (${diff_target}%)</td></tr><tr><td><b>Raw value</b></td><td>${result.average_raw} ${result.unit_str} +/- ${result.margin_str}% (n=${len(result.result())})</td></tr><tr><td><b>Converted value</b></td><td>${result.average} ${output_unit} +/- ${result.margin_str}% (n=${len(result.result())})</td></tr></table><br/>"\\
 								% else:
 	, null, "${benchmark}"\\
 								% endif
@@ -828,9 +837,11 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 <% target_value = None %>\\
 								<tr><td>${metric}</td>
 								% if 'reference' in db:
-									% if (benchmark in db["target_result"] and (metric == "default" or metric in db["target_result"][benchmark].metrics)):
+									% if (benchmark in db["target_result"] and (metric in db["target_result"][benchmark].results(BenchSubTestType.METRIC))):
 									<%
-										target_value, unit = db["target_result"][benchmark].result(metric)
+										ref_metric = db["target_result"][benchmark].result(metric)
+										target_value = ref_metric.mean()
+										unit = ref_metric.unit
 									%>
 									<td>${"{:.2f} {}".format(target_value, unit)}</td>
 									% else:
@@ -839,9 +850,9 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 								%endif
 								% for commit in db["commits"]:
 									% if benchmark in db["commits"][commit]['reports'][report.name]:
-									% if metric == "default" or metric in db["commits"][commit]['reports'][report.name][benchmark].metrics:
+									% if metric in db["commits"][commit]['reports'][report.name][benchmark].results(BenchSubTestType.METRIC):
 									<%
-										value, unit = db["commits"][commit]['reports'][report.name][benchmark].result(metric)
+										value, unit = db["commits"][commit]['reports'][report.name][benchmark].metrics[metric]
 									%>
 										<td>${"{:.2f} {}".format(value, unit)}\\
 										% if target_value is not None:
@@ -869,13 +880,17 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 						target_changes = dict()
 						changes = set()
 
+						# Add the target report in the list of reports if it
+						# contains tests for this benchmark
 						target_result = None
 						if 'target_result' in db and benchmark in db['target_result']:
-							if db['target_result'][benchmark].test_type == "unit":
+							subtests = db['target_result'][benchmark].results(BenchSubTestType.SUBTEST_STRING)
+							if len(subtests) > 0:
 								target_result = db['target_result'][benchmark]
 								target_result.name = "Target"
 								stats_status[target_result.name] = dict()
 								unit_results.append(target_result)
+
 						for report in db['reports']:
 							for commit in report.commits:
 								for result in commit.results:
@@ -890,36 +905,43 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 
 						all_tests = set()
 						for result in unit_results:
-							all_tests |= set(result.unit_results)
+							all_tests |= set(result.results(BenchSubTestType.SUBTEST_STRING))
+							result.unit_results = dict()
 
 						unit_tests = set()
 						for test in all_tests:
 							value = None
 							for result in unit_results:
-								if "<" in test: # Hide subtests
+								if "<" in test: # Hide subsubtests
 									continue
-								if test not in result.unit_results:
-									result.unit_results[test] = "missing"
+								subtest = result.result(test)
+								if subtest is None or len(subtest) == 0:
+									status = "missing"
+								else:
+									if len(subtest.to_set()) == 1:
+										status = subtest[0]
+									else:
+										status = "unstable"
+								result.unit_results[test] = status
 
 								# Collect stats on all the status
-								res = result.unit_results[test]
-								if res not in stats_status[result.name]:
-									stats_status[result.name][res] = 0
-									statuses |= set([res])
-								stats_status[result.name][res] += 1
+								if status not in stats_status[result.name]:
+									stats_status[result.name][status] = 0
+									statuses |= set([status])
+								stats_status[result.name][status] += 1
 
-								if value == None and result.unit_results[test] != "missing":
-									value = result.unit_results[test]
+								if value == None and status != "missing":
+									value = status
 									continue
-								if value != result.unit_results[test] and result.unit_results[test] != "missing":
+								if value != status and status != "missing":
 									unit_tests |= set([test])
 
 								if (target_result is None or result == target_result or
-									target_result.unit_results[test] == result.unit_results[test]):
+									target_result.unit_results[test] == status):
 									continue
 
 								change = "{} -> {}".format(target_result.unit_results[test],
-								                           result.unit_results[test])
+								                           status)
 								if change not in target_changes[result.name]:
 									target_changes[result.name][change] = 0
 									changes |= set([change])
@@ -1010,8 +1032,12 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 			report_names = [r.name for r in reports]
 			title = "Performance report on the runs named '{run_name}'".format(run_name=report_names)
 
-		html = Template(html_template).render(title=title, db=db, output_unit=output_unit,
-							default_commit=list(db["commits"])[-1])
+		template = Template(html_template)
+		try:
+			html = template.render(title=title, db=db, output_unit=output_unit,
+			                       default_commit=list(db["commits"])[-1])
+		except:
+			html = exceptions.html_error_template().render().decode()
 
 		with open(output, 'w') as f:
 			f.write(html)
@@ -1027,6 +1053,7 @@ def gen_report(log_folder, restrict_commits):
 		report = genPerformanceReport(log_folder,
                                 restrict_to_commits = restrict_commits)
 		report.enhance_report([])
+
 	return report
 
 if __name__ == "__main__":

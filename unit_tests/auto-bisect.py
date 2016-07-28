@@ -108,9 +108,9 @@ if not args.reuse_data:
 
 # List the events
 max_variance = 0.025
-task_list=[(initial_commit.hex[0:7], 3),
-		   (repo.revparse_single('HEAD').hex[0:7], 3)]
-report = create_report(task_list, max_variance, args.reuse_data)
+report = create_report(initial_commit.hex[0:7],
+                       (repo.revparse_single('HEAD')).hex[0:7], max_variance,
+                       args.reuse_data)
 
 # test the variance of every commit
 variance_too_high = 0
@@ -132,14 +132,15 @@ for commit in report.commits:
 			e_perf = 0
 
 		if e_perf > 0:
-			error = abs(e_perf - result.result()) * 100.0 / e_perf
+			perf = result.result().mean()
+			error = abs(e_perf - perf) * 100.0 / e_perf
 		else:
 			error = 0
 
 		sample_error.append(error)
 		if error > max_variance * 100:
 			msg = "Commit {}'s performance differs significantly from the target, {} vs {}"
-			print(msg.format(commit.sha1, result.result(), e_perf))
+			print(msg.format(commit.sha1, perf, e_perf))
 			variance_too_high += 1
 
 false_positive = 0
