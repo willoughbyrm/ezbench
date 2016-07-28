@@ -4,6 +4,6 @@ test_exec_time=1
 [ -z "$REPO_PERF_BISECT" ] && return 1
 
 perf_bisect_run() {
-    # Set $REPO_PERF_BISECT and $PERF_BISECT in user_parameters.sh
-    ENV_DUMP_RESTRICT_TO_BINARY="no_dump_please" run_bench 0 perf.py | grep -v "Env_dump:"
+    # Set $REPO_PERF_BISECT in user_parameters.sh
+    perf.py | grep -v "^EZBENCH:"
 }

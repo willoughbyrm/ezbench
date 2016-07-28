@@ -1,39 +1,46 @@
 source "$ezBenchDir/profiles.d/utils/common.sh"
 source "$ezBenchDir/profiles.d/utils/git-repo.sh"
-source "$ezBenchDir/profiles.d/utils/auto-deploy.sh"
 
-# Accessible variables
-# $ezBenchDir            [RO]: Directory of the ezbench
-# ------------------
-# $rounds                [WO]: Default number of rounds
-# $makeAndDeployCmd      [WO]: Command to compile and deploy the current git HEAD
-# $gitVersionDeployedCmd [WO]: Command to print out the sha1 of the version currently deployed
-# $repoDir                [WO]: Path to the git repo to use for this profile
-# $reportName            [WO]: Name to give to your report
-# $testsDir              [WO]: List of pathes to the directories containing the tests for this profile
-# $testsList             [WO]: List of tests that should be ran in this profile
-# $testExcludeList       [WO]: List of tests that should be excluded in this profile
+# MANDATORY: Default version of the function that deploys a previously-compiled
+# version $version.
+# Inputs:
+#   - $version: the version to deploy
+# Outputs:
+#   - All the environment variables set to work as expected
+function repo_deploy_version() {
+    rm -rf $PROFILE_DEPLOY_DIR 2> /dev/null
 
-function repo_compile_version() {
+    mkdir $PROFILE_DEPLOY_DIR
+    GIT_DIR="$repoDir/.git" git show $version:perf.py > $PROFILE_DEPLOY_DIR/perf.py || return 72
+    chmod +x $PROFILE_DEPLOY_DIR/perf.py || return 72
+    export PROFILE_DEFAULT_LAST_COMPILED_VERSION=$version
+
+    return 0
+}
+
+# MANDATORY: Print the currently-deployed version of the repo
+# Inputs:
+#   - $repoDir
+function profile_repo_deployed_version() {
+	echo $PROFILE_DEFAULT_LAST_COMPILED_VERSION
+}
+
+function bisect_test_compile_and_deploy() {
     # Return error codes:
     # 71: Compilation error
     # 72: Deployment error
 
-    deploy_dir="$(profile_repo_deployment_version_dir)/bin"
-    mkdir -p $deploy_dir
-    ./perf.py -b || return 71
+    # Check that the deploy folder exists
+    if [ ! -d "$DEPLOY_BASE_DIR" ]; then
+        echo "ERROR: Please set DEPLOY_BASE_DIR ($DEPLOY_BASE_DIR) to an acceptable directory in user_parameters.sh."
+        return 72
+    fi
 
-    sha1=$(git rev-parse --short HEAD)
-    deploy_name="$deploy_dir/perf.py"
-
-    cp ./perf.py "$deploy_name"
-    sed -i "s/{GIT_SHA1}/${sha1}/" $deploy_name
-    return 0
+    repo_deploy_version
 }
 
-function profile_repo_deployed_version() {
-	perf.py -v 2> /dev/null
-}
+makeAndDeployCmd="bisect_test_compile_and_deploy"
 
 rounds=3
 repoDir="$REPO_PERF_BISECT"
+export PATH=$PROFILE_DEPLOY_DIR:$PATH
