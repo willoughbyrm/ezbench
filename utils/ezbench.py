@@ -894,7 +894,7 @@ class SmartEzbench:
         self.__log(Criticality.II, "All the dependencies are met, generate a report...")
 
         # Generate a report to compare the goal with the current state
-        report = genPerformanceReport(self.log_folder, silentMode = True)
+        report = Report(self.log_folder, silentMode = True)
         self.__log(Criticality.II,
                    "The report contains {count} commits".format(count=len(report.commits)))
 
@@ -1010,7 +1010,7 @@ class SmartEzbench:
             git_history = self.git_history()
 
         # Generate the report, order commits based on the git history
-        r = genPerformanceReport(self.log_folder, silentMode = True,
+        r = Report(self.log_folder, silentMode = True,
                                  restrict_to_commits = restrict_to_commits)
         r.enhance_report([c.sha1 for c in git_history])
         return r
@@ -1053,7 +1053,7 @@ class SmartEzbench:
         if git_history is None:
             git_history = self.git_history()
         commits_rev_order = [c.sha1 for c in git_history]
-        r = genPerformanceReport(self.log_folder, silentMode = True)
+        r = Report(self.log_folder, silentMode = True)
         r.enhance_report(commits_rev_order, max_variance, perf_diff_confidence,
                          smallest_perf_change)
 
@@ -2375,9 +2375,6 @@ def readUnitRun(filepath):
             if len(fields) == 2:
                 tests[fields[0]] = fields[1].strip()
     return tests
-
-def genPerformanceReport(log_folder, silentMode = False, restrict_to_commits = []):
-    return Report(log_folder, silentMode, restrict_to_commits)
 
 def getPerformanceResultsCommitBenchmark(commit, benchmark):
     for result in commit.results:

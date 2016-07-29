@@ -54,7 +54,7 @@ if os.path.exists(commits_sav_path):
     print()
 shutil.copyfile(commits_path, commits_sav_path)
 
-report = genPerformanceReport(args.log_folder, False)
+report = Report(args.log_folder, False)
 
 f = open(commits_path, 'w')
 
