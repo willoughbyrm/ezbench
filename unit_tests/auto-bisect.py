@@ -121,8 +121,8 @@ for commit in report.commits:
 	if commit.full_name.endswith("template"):
 		continue
 	for result in commit.results:
-		# Check that the results are for the right benchmark
-		if result.benchmark.full_name != 'perf_bisect':
+		# Check that the results are for the right test
+		if result.test.full_name != 'perf_bisect':
 			continue
 
 		e_perf, e_var, e_build, e_exec = commit_info(commit)
@@ -147,12 +147,12 @@ false_positive = 0
 relative_error = []
 for e in report.events:
 	if type(e) is EventPerfChange:
-		if result.benchmark.full_name != 'perf_bisect':
+		if result.test.full_name != 'perf_bisect':
 			continue
 
 		o_perf, o_variance, o_build, o_exec = commit_info(e.commit_range.old)
 		n_perf, n_variance, n_build, n_exec = commit_info(e.commit_range.new)
-		wanted = EventPerfChange(e.benchmark, e.commit_range, o_perf, n_perf, 1.0)
+		wanted = EventPerfChange(e.test, e.commit_range, o_perf, n_perf, 1.0)
 
 		if (not o_exec and n_exec) or (o_exec and not n_exec):
 			if e.diff() != -1 and e.diff() != float("+inf"):

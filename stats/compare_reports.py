@@ -44,14 +44,14 @@ from env_dump_parser import *
 html_name="index.html"
 
 def __env_add_result__(db, human_envs, report, commit, result):
-	if result.benchmark.full_name not in human_envs:
+	if result.test.full_name not in human_envs:
 		for run in result.runs:
 			envfile = run.env_file
 			if envfile is not None:
 				fullpath = report.log_folder + "/" + envfile
-				human_envs[result.benchmark.full_name] = EnvDumpReport(fullpath, True)
-	if result.benchmark.full_name not in db['env_sets']:
-		db['env_sets'][result.benchmark.full_name] = list()
+				human_envs[result.test.full_name] = EnvDumpReport(fullpath, True)
+	if result.test.full_name not in db['env_sets']:
+		db['env_sets'][result.test.full_name] = list()
 	for e in range(0, len(result.runs)):
 		# Create the per-run information
 		envfile = result.runs[e].env_file
@@ -75,7 +75,7 @@ def __env_add_result__(db, human_envs, report, commit, result):
 
 		# Compare the set to existing ones
 		found = False
-		for r_set in db['env_sets'][result.benchmark.full_name]:
+		for r_set in db['env_sets'][result.test.full_name]:
 			if r  == r_set['set']:
 				r_set['users'].append(tup)
 				found = True
@@ -85,7 +85,7 @@ def __env_add_result__(db, human_envs, report, commit, result):
 			new_entry = dict()
 			new_entry['set'] = r
 			new_entry['users'] = [tup]
-			db['env_sets'][result.benchmark.full_name].append(new_entry)
+			db['env_sets'][result.test.full_name].append(new_entry)
 
 def reports_to_html(reports, output, output_unit = None, title = None,
 			   commit_url = None, verbose = False, reference_report = None):
@@ -95,12 +95,12 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 		output_unit = "FPS"
 
 	# Parse the results and then create one report with the following structure:
-	# commit -> report_name -> benchmark -> bench results
+	# commit -> report_name -> test -> bench results
 	db = dict()
 	db["commits"] = collections.OrderedDict()
 	db["reports"] = list()
 	db["events"] = dict()
-	db["benchmarks"] = list()
+	db["tests"] = list()
 	db["metrics"] = dict()
 	db['env_sets'] = dict()
 	db["envs"] = dict()
@@ -118,23 +118,23 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 			average = convert_unit(average_raw, result.unit_str, output_unit)
 			average = float("{0:.2f}".format(average))
 			average_raw = float("{0:.2f}".format(average_raw))
-			if (not result.benchmark.full_name in db["targets"] or
-				db["targets"][result.benchmark.full_name] == 0):
-					db["targets"][result.benchmark.full_name] = average
-					db["targets_raw"][result.benchmark.full_name] = average_raw
-					db["target_result"][result.benchmark.full_name] = result
+			if (not result.test.full_name in db["targets"] or
+				db["targets"][result.test.full_name] == 0):
+					db["targets"][result.test.full_name] = average
+					db["targets_raw"][result.test.full_name] = average_raw
+					db["target_result"][result.test.full_name] = result
 
 			__env_add_result__(db, human_envs, reference_report, reference_report.commits[-1], result)
 
 	for report in reports:
 		db["reports"].append(report)
 
-		# drop the no-op benchmark
-		report.benchmarks = list(filter(lambda b: b.full_name != "no-op", report.benchmarks))
+		# drop the no-op test
+		report.tests = list(filter(lambda b: b.full_name != "no-op", report.tests))
 
-		# make sure all the benchmarks are listed in db["envs"]
-		for benchmark in report.benchmarks:
-			db["envs"][benchmark.full_name] = dict()
+		# make sure all the tests are listed in db["envs"]
+		for test in report.tests:
+			db["envs"][test.full_name] = dict()
 
 		db["events"][report.name] = list()
 		for event in report.events:
@@ -146,7 +146,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 				event.fixed_commit_range.new.annotation_long = str(event)
 			elif type(event) is EventPerfChange:
 				for result in event.commit_range.new.results:
-					if result.benchmark.full_name != event.benchmark.full_name:
+					if result.test.full_name != event.test.full_name:
 						continue
 					result.annotation = str(event)
 			db["events"][report.name].append(event)
@@ -154,7 +154,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 		# add all the commits
 		for commit in report.commits:
 			# drop the no-op results
-			commit.results = list(filter(lambda r: r.benchmark.full_name != "no-op", commit.results))
+			commit.results = list(filter(lambda r: r.test.full_name != "no-op", commit.results))
 			if len(commit.results) == 0 and not hasattr(commit, 'annotation'):
 				continue
 
@@ -173,10 +173,10 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 			score_sum = 0
 			count = 0
 			for result in commit.results:
-				if not result.benchmark.full_name in db["benchmarks"]:
-					db["benchmarks"].append(result.benchmark.full_name)
-					db["metrics"][result.benchmark.full_name] = []
-				db["commits"][commit.label]['reports'][report.name][result.benchmark.full_name] = result
+				if not result.test.full_name in db["tests"]:
+					db["tests"].append(result.test.full_name)
+					db["metrics"][result.test.full_name] = []
+				db["commits"][commit.label]['reports'][report.name][result.test.full_name] = result
 				average_raw = result.result().mean()
 				average = convert_unit(average_raw, result.unit_str, output_unit)
 				score_sum += average
@@ -187,19 +187,19 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 				result.margin_str = float("{0:.2f}".format(result.result().margin() * 100))
 
 				# Compare to the target
-				if (not result.benchmark.full_name in db["targets"] or
-				(db["targets"][result.benchmark.full_name] == 0 and 'reference_name' not in db)):
-					db["targets"][result.benchmark.full_name] = result.average
-					db["targets_raw"][result.benchmark.full_name] = result.average_raw
+				if (not result.test.full_name in db["targets"] or
+				(db["targets"][result.test.full_name] == 0 and 'reference_name' not in db)):
+					db["targets"][result.test.full_name] = result.average
+					db["targets_raw"][result.test.full_name] = result.average_raw
 				result.diff_target = compute_perf_difference(output_unit,
-				                                             db["targets"][result.benchmark.full_name],
+				                                             db["targets"][result.test.full_name],
 				                                             result.average)
 
 				# Get the metrics
 				result.metrics = dict()
 				for metric in result.results(BenchSubTestType.METRIC):
-					if metric not in db["metrics"][result.benchmark.full_name]:
-						db["metrics"][result.benchmark.full_name].append(metric)
+					if metric not in db["metrics"][result.test.full_name]:
+						db["metrics"][result.test.full_name].append(metric)
 
 					metric_object = result.result(metric)
 					result.metrics[metric] = (metric_object.mean(), metric_object.unit)
@@ -242,8 +242,8 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 			final_union = final_union | diff
 		db['env_diff_keys'][bench] = sorted(dict(final_union).keys())
 
-	# Sort the benchmarks by name to avoid ever-changing layouts
-	db["benchmarks"] = sort(db["benchmarks"])
+	# Sort the tests by name to avoid ever-changing layouts
+	db["tests"] = sort(db["tests"])
 
 	# Support creating new URLs
 	if commit_url is not None:
@@ -398,8 +398,8 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 					return activeColsCount
 				}
 
-				function adjustChartSize(id_chart, reportsCount, benchmarkCount) {
-					var size = 75 + reportsCount * (25 + (benchmarkCount * 8));
+				function adjustChartSize(id_chart, reportsCount, testCount) {
+					var size = 75 + reportsCount * (25 + (testCount * 8));
 					id_chart.style.height = size + "px";
 					id_chart.style.width = "100%";
 				}
@@ -465,8 +465,8 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 					%>
 					dataTable.addColumn('string', 'Commits');
 					dataTable.addColumn({type: 'string', role:'annotation'});
-					% for benchmark in db["benchmarks"]:
-					dataTable.addColumn('number', '${benchmark}');
+					% for test in db["tests"]:
+					dataTable.addColumn('number', '${test}');
 					dataTable.addColumn({type: 'string', role: 'tooltip', p: { html: true }});
 					% endfor
 
@@ -478,15 +478,15 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 						%else:
 	, null\\
 						% endif
-						% for benchmark in db["benchmarks"]:
-							% if benchmark in db["commits"][commit]['reports'][report]:
+						% for test in db["tests"]:
+							% if test in db["commits"][commit]['reports'][report]:
 	<%
-		result = db["commits"][commit]['reports'][report][benchmark]
+		result = db["commits"][commit]['reports'][report][test]
 		diff_target = "{0:.2f}".format(result.diff_target)
 	%>\\
-	, ${diff_target}, "${tooltip_commit_table(commit)}<h4>Perf</h4><table><tr><td><b>Benchmark</b></td><td>${benchmark}</td></tr><tr><td><b>Target</b></td><td>${db['targets'][benchmark]} ${output_unit} (${diff_target}%)</td></tr><tr><td><b>Raw value</b></td><td>${result.average_raw} ${result.unit_str} +/- ${result.margin_str}% (n=${len(result.result())})</td></tr><tr><td><b>Converted value</b></td><td>${result.average} ${output_unit} +/- ${result.margin_str}% (n=${len(result.result())})</td></tr></table><br/>"\\
+	, ${diff_target}, "${tooltip_commit_table(commit)}<h4>Perf</h4><table><tr><td><b>Test</b></td><td>${test}</td></tr><tr><td><b>Target</b></td><td>${db['targets'][test]} ${output_unit} (${diff_target}%)</td></tr><tr><td><b>Raw value</b></td><td>${result.average_raw} ${result.unit_str} +/- ${result.margin_str}% (n=${len(result.result())})</td></tr><tr><td><b>Converted value</b></td><td>${result.average} ${output_unit} +/- ${result.margin_str}% (n=${len(result.result())})</td></tr></table><br/>"\\
 								% else:
-	, null, "${benchmark}"\\
+	, null, "${test}"\\
 								% endif
 						% endfor
 	],
@@ -558,8 +558,8 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 					dataTable.addColumn('string', 'Report');
 					dataTable.addColumn('number', 'Average');
 					dataTable.addColumn({type: 'string', role: 'tooltip', p: { html: true }});
-					% for benchmark in db["benchmarks"]:
-					dataTable.addColumn('number', '${benchmark}');
+					% for test in db["tests"]:
+					dataTable.addColumn('number', '${test}');
 					dataTable.addColumn({type: 'string', role: 'tooltip', p: { html: true }});
 					% endfor
 
@@ -583,25 +583,25 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 	${btag}${r.name}: ${db["commits"][commit]['reports'][r.name]["average"]} ${output_unit} (${diff}%)${btagend}<br/>\\
 								% endfor
 	</p>"\\
-								% for benchmark in db["benchmarks"]:
-									% if benchmark in db["commits"][commit]['reports'][report.name]:
-	, ${db["commits"][commit]['reports'][report.name][benchmark].average}, "<h3>${report.name} - ${benchmark}</h3><p>\\
+								% for test in db["tests"]:
+									% if test in db["commits"][commit]['reports'][report.name]:
+	, ${db["commits"][commit]['reports'][report.name][test].average}, "<h3>${report.name} - ${test}</h3><p>\\
 										% for r in db["reports"]:
 	<%
-												if not r.name in db["commits"][commit]['reports'] or benchmark not in db["commits"][commit]['reports'][r.name]:
+												if not r.name in db["commits"][commit]['reports'] or test not in db["commits"][commit]['reports'][r.name]:
 													continue
-												diff = compute_perf_difference(output_unit, db["commits"][commit]['reports'][report.name][benchmark].average, db["commits"][commit]['reports'][r.name][benchmark].average)
+												diff = compute_perf_difference(output_unit, db["commits"][commit]['reports'][report.name][test].average, db["commits"][commit]['reports'][r.name][test].average)
 												diff = float("{0:.2f}".format(diff))
 												btag = btagend = ""
 												if r.name == report.name:
 													btag="<b>"
 													btagend="</b>"
 											%>\\
-	${btag}${r.name}: ${db["commits"][commit]['reports'][r.name][benchmark].average} ${output_unit} (${diff}%)${btagend}<br/>\\
+	${btag}${r.name}: ${db["commits"][commit]['reports'][r.name][test].average} ${output_unit} (${diff}%)${btagend}<br/>\\
 										% endfor
 	</p>"\\
 							% else:
-	, null, "${benchmark}"\\
+	, null, "${test}"\\
 							% endif
 							% endfor
 	],
@@ -663,7 +663,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 				function drawTable() {
 					% if len(db["reports"]) > 1:
 						var dataTable = new google.visualization.DataTable();
-						dataTable.addColumn('string', 'Benchmark');
+						dataTable.addColumn('string', 'Test');
 						dataTable.addColumn('string', 'Report 1');
 						dataTable.addColumn('string', 'Report 2');
 						dataTable.addColumn('number', '%');
@@ -675,15 +675,15 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 								% if report1.name in db["commits"][commit]['reports']:
 									% for report2 in db["reports"]:
 										% if report2.name != report1.name and report2.name in db["commits"][commit]['reports']:
-											% for benchmark in db["benchmarks"]:
-												% if (benchmark in db["commits"][commit]['reports'][report1.name] and benchmark in db["commits"][commit]['reports'][report2.name]):
+											% for test in db["tests"]:
+												% if (test in db["commits"][commit]['reports'][report1.name] and test in db["commits"][commit]['reports'][report2.name]):
 												<%
-													r1 = db["commits"][commit]['reports'][report1.name][benchmark]
-													r2 = db["commits"][commit]['reports'][report2.name][benchmark]
+													r1 = db["commits"][commit]['reports'][report1.name][test]
+													r2 = db["commits"][commit]['reports'][report2.name][test]
 													perf_diff = compute_perf_difference(r1.unit_str, r1.average_raw, r2.average_raw)
 													perf_diff = "{0:.2f}".format(perf_diff)
 												%>
-							dataTable.addRows([['${benchmark}', '${report1.name}', '${report2.name}', ${perf_diff}, "${r1.average_raw} => ${r2.average_raw} ${r1.unit_str}"]])
+							dataTable.addRows([['${test}', '${report1.name}', '${report2.name}', ${perf_diff}, "${r1.average_raw} => ${r2.average_raw} ${r1.unit_str}"]])
 												% endif
 											% endfor
 										% endif
@@ -694,7 +694,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 						%endfor
 					% else:
 						var dataTable = new google.visualization.DataTable();
-						dataTable.addColumn('string', 'Benchmark');
+						dataTable.addColumn('string', 'Test');
 						dataTable.addColumn('string', 'Report');
 						dataTable.addColumn('number', '% of target');
 						dataTable.addColumn('string', 'Comments');
@@ -703,14 +703,14 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 						if (currentCommit == "${commit}") {
 							% for report1 in db["reports"]:
 								% if report1.name in db["commits"][commit]['reports']:
-									% for benchmark in db["benchmarks"]:
-										% if (benchmark in db["commits"][commit]['reports'][report1.name] and benchmark in db["targets"]):
+									% for test in db["tests"]:
+										% if (test in db["commits"][commit]['reports'][report1.name] and test in db["targets"]):
 										<%
-											r1 = db["commits"][commit]['reports'][report1.name][benchmark]
-											perf_diff = compute_perf_difference(r1.unit_str, db["targets_raw"][benchmark], r1.average_raw)
+											r1 = db["commits"][commit]['reports'][report1.name][test]
+											perf_diff = compute_perf_difference(r1.unit_str, db["targets_raw"][test], r1.average_raw)
 											perf_diff = "{0:.2f}".format(perf_diff)
 										%>\\
-dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.average_raw}(${report1.name}) => ${db["targets_raw"][benchmark]}(target) ${r1.unit_str}"]])
+dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_raw}(${report1.name}) => ${db["targets_raw"][test]}(target) ${r1.unit_str}"]])
 										% endif
 									% endfor
 								% endif
@@ -752,10 +752,10 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 				</ul>
 			% endfor
 
-			<h2>Benchmarks</h2>
+			<h2>Tests</h2>
 
-				% for benchmark in db["benchmarks"]:
-					<h3>${benchmark}</h3>
+				% for test in db["tests"]:
+					<h3>${test}</h3>
 
 					<div class="css-treeview">
 						<%def name="outputtreenode(node, id, label, attr = '')">
@@ -776,14 +776,14 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 						</%def>
 
 						<ul>
-							${outputtreenode(db["envs"][benchmark], benchmark + "_envroot", "Environment", 'checked="checked"')}
+							${outputtreenode(db["envs"][test], test + "_envroot", "Environment", 'checked="checked"')}
 						</ul>
 					</div>
 
 					<table>
 						<tr>
 							<th>Key</th>
-							% for env_set in db["env_sets"][benchmark]:
+							% for env_set in db["env_sets"][test]:
 							<%
 								users = ""
 								for user in env_set['users']:
@@ -794,13 +794,13 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 							<th>${users}</th>
 							% endfor
 						</tr>
-						% for key in db["env_diff_keys"][benchmark]:
+						% for key in db["env_diff_keys"][test]:
 						<tr>
 							<td>${key}</td>
 							<%
 								prev = None
 							%>
-							% for env_set in db["env_sets"][benchmark]:
+							% for env_set in db["env_sets"][test]:
 							<%
 								if key in dict(env_set['set']):
 									env_val = dict(env_set['set'])[key]
@@ -828,18 +828,18 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 							<th>Target</th>
 							%endif
 							% for commit in db["commits"]:
-							% if benchmark in db["commits"][commit]['reports'][report.name]:
+							% if test in db["commits"][commit]['reports'][report.name]:
 							<th>${commit}</th>
 							% endif
 							% endfor
 
-							% for metric in sorted(db["metrics"][benchmark]):
+							% for metric in sorted(db["metrics"][test]):
 <% target_value = None %>\\
 								<tr><td>${metric}</td>
 								% if 'reference' in db:
-									% if (benchmark in db["target_result"] and (metric in db["target_result"][benchmark].results(BenchSubTestType.METRIC))):
+									% if (test in db["target_result"] and (metric in db["target_result"][test].results(BenchSubTestType.METRIC))):
 									<%
-										ref_metric = db["target_result"][benchmark].result(metric)
+										ref_metric = db["target_result"][test].result(metric)
 										target_value = ref_metric.mean()
 										unit = ref_metric.unit
 									%>
@@ -849,10 +849,10 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 									% endif
 								%endif
 								% for commit in db["commits"]:
-									% if benchmark in db["commits"][commit]['reports'][report.name]:
-									% if metric in db["commits"][commit]['reports'][report.name][benchmark].results(BenchSubTestType.METRIC):
+									% if test in db["commits"][commit]['reports'][report.name]:
+									% if metric in db["commits"][commit]['reports'][report.name][test].results(BenchSubTestType.METRIC):
 									<%
-										value, unit = db["commits"][commit]['reports'][report.name][benchmark].metrics[metric]
+										value, unit = db["commits"][commit]['reports'][report.name][test].metrics[metric]
 									%>
 										<td>${"{:.2f} {}".format(value, unit)}\\
 										% if target_value is not None:
@@ -881,12 +881,12 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 						changes = set()
 
 						# Add the target report in the list of reports if it
-						# contains tests for this benchmark
+						# contains tests for this test
 						target_result = None
-						if 'target_result' in db and benchmark in db['target_result']:
-							subtests = db['target_result'][benchmark].results(BenchSubTestType.SUBTEST_STRING)
+						if 'target_result' in db and test in db['target_result']:
+							subtests = db['target_result'][test].results(BenchSubTestType.SUBTEST_STRING)
 							if len(subtests) > 0:
-								target_result = db['target_result'][benchmark]
+								target_result = db['target_result'][test]
 								target_result.name = "Target"
 								stats_status[target_result.name] = dict()
 								unit_results.append(target_result)
@@ -894,7 +894,7 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 						for report in db['reports']:
 							for commit in report.commits:
 								for result in commit.results:
-									if result.benchmark.full_name != benchmark:
+									if result.test.full_name != test:
 										continue
 									if result.test_type != "unit":
 										continue
@@ -973,7 +973,7 @@ dataTable.addRows([['${benchmark}', '${report1.name}', ${perf_diff}, "${r1.avera
 						% endfor
 						</table>
 
-						% if 'target_result' in db and benchmark in db['target_result']:
+						% if 'target_result' in db and test in db['target_result']:
 						<h5>Status changes</h4>
 						<table>
 						<tr><th>Version</th>
@@ -1065,7 +1065,7 @@ if __name__ == "__main__":
 	parser.add_argument("--output", help="Report html file path")
 	parser.add_argument("--commit_url", help="HTTP URL pattern, {commit} contains the SHA1")
 	parser.add_argument("--quiet", help="Be quiet when generating the report", action="store_true")
-	parser.add_argument("--reference", help="Compare the benchmarks to this reference report")
+	parser.add_argument("--reference", help="Compare the test results to this reference report")
 	parser.add_argument("--restrict_commits", help="Restrict commits to this list (space separated)")
 	parser.add_argument("log_folder", nargs='+')
 	args = parser.parse_args()

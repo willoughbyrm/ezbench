@@ -170,13 +170,13 @@ function show_help {
     echo "    Optional arguments:"
     echo "        -P <profile name>"
     echo "        -p <path_repo>"
-    echo "        -r <benchmarking rounds> (default: 3)"
-    echo "        -b <benchmark regexp> include these benchmarks to run"
-    echo "        -B <benchmark regexp> exclude these benchamrks from running"
+    echo "        -r <test rounds> (default: 3)"
+    echo "        -b <test regexp> include these benchmarks to run"
+    echo "        -B <test regexp> exclude these benchamrks from running"
     echo "        -m <make and deploy command> (default: 'make -j8 install', '' to skip the compilation)"
     echo "        -N <log folder's name> (default: current date and time)"
     echo "        -T <path> source the test definitions from this folder"
-    echo "        -k dry run, do not compile any version or execute any benchmark"
+    echo "        -k dry run, do not compile any version or execute any test"
     echo "        -c configuration shell script to be run after user_parameters.sh"
     echo ""
     echo "    Other actions:"
@@ -663,7 +663,7 @@ do
         postHookFuncName=${testNames[$t]}_run_post_hook
         processHookFuncName=${testNames[$t]}_process
 
-        # Run the benchmark
+        # Run the test
         for (( c=$run; c<$run+$rounds; c++ ))
         do
             # Exit if asked to

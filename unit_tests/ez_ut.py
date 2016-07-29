@@ -80,8 +80,8 @@ def create_report(base_sha1, head_sha1, max_variance = 0.025, reuse_data=True):
 	sbench = SmartEzbench(ezbench_dir, report_name)
 	sbench.set_profile("bisect_test")
 
-	sbench.force_benchmark_rounds(head_sha1, 'perf_bisect', 3)
-	sbench.force_benchmark_rounds(base_sha1, 'perf_bisect', 3)
+	sbench.force_test_rounds(head_sha1, 'perf_bisect', 3)
+	sbench.force_test_rounds(base_sha1, 'perf_bisect', 3)
 
 	# Run until all the enhancements are made!
 	git_history = sbench.git_history()
@@ -119,7 +119,7 @@ def find_event_from_commit(repo, report, type_event, sha1):
 	for e in report.events:
 		if type(e) is not type_event:
 			continue
-		if e.benchmark.full_name != 'perf_bisect':
+		if e.test.full_name != 'perf_bisect':
 			continue
 
 		# If the range is one commit, we can easily find the commit by just

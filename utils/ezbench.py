@@ -80,9 +80,9 @@ class EzbenchExitCode(Enum):
     UNK_ERROR = 255
 
 class EzbenchRun:
-    def __init__(self, commits, benchmarks, versions, predicted_execution_time, repo_type, repo_dir, repo_head, deployed_commit, exit_code):
+    def __init__(self, commits, tests, versions, predicted_execution_time, repo_type, repo_dir, repo_head, deployed_commit, exit_code):
         self.commits = commits
-        self.benchmarks = benchmarks
+        self.tests = tests
         self.versions = versions
         self.predicted_execution_time = predicted_execution_time
         self.repo_type = repo_type
@@ -121,11 +121,11 @@ class Ezbench:
         except IOError:
             return False
 
-    def __ezbench_cmd_base(self, benchmarks = [], benchmark_excludes = [], rounds = None, dry_run = False, list_benchmarks = False, list_built_versions = False):
+    def __ezbench_cmd_base(self, tests = [], test_excludes = [], rounds = None, dry_run = False, list_tests = False, list_built_versions = False):
         ezbench_cmd = []
         ezbench_cmd.append(self.ezbench_path)
 
-        if list_benchmarks:
+        if list_tests:
             ezbench_cmd.append("-l")
             return ezbench_cmd, ""
 
@@ -139,11 +139,11 @@ class Ezbench:
         if self.repo_path is not None:
             ezbench_cmd.append("-p"); ezbench_cmd.append(self.repo_path)
 
-        if len(benchmarks) > 0:
+        if len(tests) > 0:
             ezbench_cmd.append("-b"); ezbench_cmd.append("-")
 
-        for benchmark_excl in benchmark_excludes:
-            ezbench_cmd.append("-B"); ezbench_cmd.append(benchmark_excl)
+        for test_excl in test_excludes:
+            ezbench_cmd.append("-B"); ezbench_cmd.append(test_excl)
 
         if rounds is not None:
             ezbench_cmd.append("-r"); ezbench_cmd.append(str(int(rounds)))
@@ -161,8 +161,8 @@ class Ezbench:
             ezbench_cmd.append("-k")
 
         stdin = ""
-        for benchmark in benchmarks:
-            stdin += benchmark + "\n"
+        for test in tests:
+            stdin += test + "\n"
 
         return ezbench_cmd, stdin
 
@@ -192,7 +192,7 @@ class Ezbench:
 
         # we need to parse the output
         commits= []
-        benchmarks = []
+        tests = []
         versions = []
         pred_exec_time = 0
         deployed_commit = ""
@@ -205,9 +205,9 @@ class Ezbench:
             m_commit_list = re_commit_list.match(line)
             m_repo = re_repo.match(line)
             if line.startswith("Tests that will be run:"):
-                benchmarks = line[24:].split(" ")
+                tests = line[24:].split(" ")
             elif line.startswith("Available tests:"):
-                benchmarks = line[17:].split(" ")
+                tests = line[17:].split(" ")
             elif line.startswith("Available versions:"):
                 versions = line[19:].strip().split(" ")
             elif line.find("estimated finish date:") >= 0:
@@ -221,26 +221,26 @@ class Ezbench:
             elif exit_code == EzbenchExitCode.TEST_INVALID_NAME and line.endswith("do not exist"):
                 print(line)
 
-        if len(benchmarks) > 0 and benchmarks[-1] == '':
-            benchmarks.pop(-1)
+        if len(tests) > 0 and tests[-1] == '':
+            tests.pop(-1)
 
         if exit_code != EzbenchExitCode.NO_ERROR:
             print("\n\nERROR: The following command '{}' failed with the error code {}. Here is its output:\n\n'{}'".format(" ".join(cmd), exit_code, output))
 
-        return EzbenchRun(commits, benchmarks, versions, pred_exec_time, repo_type, repo_dir, head_commit, deployed_commit, exit_code)
+        return EzbenchRun(commits, tests, versions, pred_exec_time, repo_type, repo_dir, head_commit, deployed_commit, exit_code)
 
-    def run_commits(self, commits, benchmarks, benchmark_excludes = [],
+    def run_commits(self, commits, tests, test_excludes = [],
                     rounds = None, dry_run = False, verbose = False):
-        ezbench_cmd, ezbench_stdin = self.__ezbench_cmd_base(benchmarks, benchmark_excludes, rounds, dry_run)
+        ezbench_cmd, ezbench_stdin = self.__ezbench_cmd_base(tests, test_excludes, rounds, dry_run)
 
         for commit in commits:
             ezbench_cmd.append(commit)
 
         return self.__run_ezbench(ezbench_cmd, ezbench_stdin, dry_run, verbose)
 
-    def available_benchmarks(self):
-        ezbench_cmd, ezbench_stdin = self.__ezbench_cmd_base(list_benchmarks = True)
-        return self.__run_ezbench(ezbench_cmd, ezbench_stdin).benchmarks
+    def available_tests(self):
+        ezbench_cmd, ezbench_stdin = self.__ezbench_cmd_base(list_tests = True)
+        return self.__run_ezbench(ezbench_cmd, ezbench_stdin).tests
 
     def available_versions(self):
         ezbench_cmd, ezbench_stdin = self.__ezbench_cmd_base(list_built_versions = True)
@@ -307,7 +307,7 @@ class Testset:
                 tests_added += 1
 
         if tests_added == 0:
-            self.__print__("no benchmarks got added", silent)
+            self.__print__("no tests got added", silent)
             return False
         else:
             return True
@@ -416,9 +416,9 @@ def list_smart_ezbench_report_names(ezbench_dir, updatedSince = 0):
     return reports
 
 class TaskEntry:
-    def __init__(self, commit, benchmark, rounds):
+    def __init__(self, commit, test, rounds):
         self.commit = commit
-        self.benchmark = benchmark
+        self.test = test
         self.rounds = rounds
         self.start_date = None
         self.exec_time = None
@@ -427,7 +427,7 @@ class TaskEntry:
         self.start_date = datetime.now()
 
     def set_timing_information(self, timingsDB):
-        time = timingsDB.data("benchmark", self.benchmark)
+        time = timingsDB.data("test", self.test)
         if len(time) > 0:
             self.exec_time = statistics.median(time)
         else:
@@ -445,7 +445,7 @@ class TaskEntry:
         return total - elapsed
 
     def __str__(self):
-        string = "{}: {}: {} run(s)".format(self.commit, self.benchmark, self.rounds)
+        string = "{}: {}: {} run(s)".format(self.commit, self.test, self.rounds)
 
         if self.exec_time is not None:
             total_delta = timedelta(0, self.exec_time * self.rounds)
@@ -677,33 +677,33 @@ class SmartEzbench:
         self.__write_attribute__('commit_url', commit_url, allow_updates = True)
         self.__log(Criticality.II, "Report commit URL has been changed to '{}'".format(commit_url))
 
-    def __add_benchmark_unlocked__(self, commit, benchmark, rounds = None):
+    def __add_test_unlocked__(self, commit, test, rounds = None):
         if commit not in self.state['commits']:
             self.state['commits'][commit] = dict()
-            self.state['commits'][commit]["benchmarks"] = dict()
+            self.state['commits'][commit]["tests"] = dict()
 
         if rounds is None:
             rounds = 3
         else:
             rounds = int(rounds)
 
-        if benchmark not in self.state['commits'][commit]['benchmarks']:
-            self.state['commits'][commit]['benchmarks'][benchmark] = dict()
-            self.state['commits'][commit]['benchmarks'][benchmark]['rounds'] = rounds
+        if test not in self.state['commits'][commit]['tests']:
+            self.state['commits'][commit]['tests'][test] = dict()
+            self.state['commits'][commit]['tests'][test]['rounds'] = rounds
         else:
-            self.state['commits'][commit]['benchmarks'][benchmark]['rounds'] += rounds
+            self.state['commits'][commit]['tests'][test]['rounds'] += rounds
 
-        # if the number of rounds is equal to 0 for a benchmark, delete it
-        if self.state['commits'][commit]['benchmarks'][benchmark]['rounds'] <= 0:
-            del self.state['commits'][commit]['benchmarks'][benchmark]
+        # if the number of rounds is equal to 0 for a test, delete it
+        if self.state['commits'][commit]['tests'][test]['rounds'] <= 0:
+            del self.state['commits'][commit]['tests'][test]
 
-        # Delete a commit that has no benchmark
-        if len(self.state['commits'][commit]['benchmarks']) == 0:
+        # Delete a commit that has no test
+        if len(self.state['commits'][commit]['tests']) == 0:
             del self.state['commits'][commit]
 
-    def add_benchmark(self, commit, benchmark, rounds = None):
+    def add_test(self, commit, test, rounds = None):
         self.__reload_state(keep_lock=True)
-        self.__add_benchmark_unlocked__(commit, benchmark, rounds)
+        self.__add_test_unlocked__(commit, test, rounds)
         self.__save_state()
         self.__release_lock()
 
@@ -715,14 +715,14 @@ class SmartEzbench:
         else:
             rounds = int(rounds)
 
-        for benchmark in sorted(testset.tests.keys()):
-            self.__add_benchmark_unlocked__(commit, benchmark,
-                                            testset.tests[benchmark] * rounds)
+        for test in sorted(testset.tests.keys()):
+            self.__add_test_unlocked__(commit, test,
+                                            testset.tests[test] * rounds)
 
         self.__save_state()
         self.__release_lock()
 
-    def __force_benchmark_rounds_unlocked__(self, commit, benchmark, at_least):
+    def __force_test_rounds_unlocked__(self, commit, test, at_least):
         if at_least < 1:
             return 0
         else:
@@ -730,28 +730,28 @@ class SmartEzbench:
 
         if commit not in self.state['commits']:
             self.state['commits'][commit] = dict()
-            self.state['commits'][commit]["benchmarks"] = dict()
+            self.state['commits'][commit]["tests"] = dict()
 
-        if benchmark not in self.state['commits'][commit]['benchmarks']:
-            self.state['commits'][commit]['benchmarks'][benchmark] = dict()
-            self.state['commits'][commit]['benchmarks'][benchmark]['rounds'] = 0
+        if test not in self.state['commits'][commit]['tests']:
+            self.state['commits'][commit]['tests'][test] = dict()
+            self.state['commits'][commit]['tests'][test]['rounds'] = 0
 
-        to_add = at_least - self.state['commits'][commit]['benchmarks'][benchmark]['rounds']
+        to_add = at_least - self.state['commits'][commit]['tests'][test]['rounds']
 
         if to_add > 0:
             self.__log(Criticality.WW,
-                       "Schedule {} more runs for the benchmark {} on commit {}".format(to_add, benchmark, commit))
+                       "Schedule {} more runs for the test {} on commit {}".format(to_add, test, commit))
 
-            self.state['commits'][commit]['benchmarks'][benchmark]['rounds'] += to_add
+            self.state['commits'][commit]['tests'][test]['rounds'] += to_add
 
         if to_add > 0:
             return to_add
         else:
             return 0
 
-    def force_benchmark_rounds(self, commit, benchmark, at_least):
+    def force_test_rounds(self, commit, test, at_least):
         self.__reload_state(keep_lock=True)
-        ret = self.__force_benchmark_rounds_unlocked__(commit, benchmark, at_least)
+        ret = self.__force_test_rounds_unlocked__(commit, test, at_least)
         self.__save_state()
         self.__release_lock()
 
@@ -777,37 +777,37 @@ class SmartEzbench:
 
         # Aggregate all the subtests
         for commit in task_tree:
-            bench_subtests = dict()
-            bench_rounds = dict()
+            test_subtests = dict()
+            test_rounds = dict()
 
-            # First, read all the benchmarks and aggregate them
-            for benchmark in task_tree[commit]["benchmarks"]:
-                basename, subtests = Benchmark.parse_name(benchmark)
-                if basename not in bench_subtests:
-                    bench_subtests[basename] = set()
-                bench_subtests[basename] |= set(subtests)
-                bench_rounds[basename] = max(bench_rounds.get(basename, 0),
-                                       task_tree[commit]["benchmarks"][benchmark]["rounds"])
+            # First, read all the tests and aggregate them
+            for test in task_tree[commit]["tests"]:
+                basename, subtests = Test.parse_name(test)
+                if basename not in test_subtests:
+                    test_subtests[basename] = set()
+                test_subtests[basename] |= set(subtests)
+                test_rounds[basename] = max(test_rounds.get(basename, 0),
+                                       task_tree[commit]["tests"][test]["rounds"])
 
             # Destroy the state before reconstructing it!
-            task_tree[commit]["benchmarks"] = dict()
-            for basename in bench_subtests:
-                full_name = Benchmark.partial_name(basename, list(bench_subtests[basename]))
-                task_tree[commit]["benchmarks"][full_name] = dict()
-                task_tree[commit]["benchmarks"][full_name]["rounds"] = bench_rounds[basename]
+            task_tree[commit]["tests"] = dict()
+            for basename in test_subtests:
+                full_name = Test.partial_name(basename, list(test_subtests[basename]))
+                task_tree[commit]["tests"][full_name] = dict()
+                task_tree[commit]["tests"][full_name]["rounds"] = test_rounds[basename]
 
         # Schedule the tests using the already-deployed version
         if deployed_version is not None and deployed_version in task_tree:
-            for benchmark in task_tree[deployed_version]["benchmarks"]:
-                rounds = task_tree[deployed_version]["benchmarks"][benchmark]["rounds"]
-                task_list.append(TaskEntry(deployed_version, benchmark, rounds))
+            for test in task_tree[deployed_version]["tests"]:
+                rounds = task_tree[deployed_version]["tests"][test]["rounds"]
+                task_list.append(TaskEntry(deployed_version, test, rounds))
             del task_tree[deployed_version]
 
         # Add all the remaining tasks in whatever order!
         for commit in task_tree:
-            for benchmark in task_tree[commit]["benchmarks"]:
-                rounds = task_tree[commit]["benchmarks"][benchmark]["rounds"]
-                task_list.append(TaskEntry(commit, benchmark, rounds))
+            for test in task_tree[commit]["tests"]:
+                rounds = task_tree[commit]["tests"][test]["rounds"]
+                task_list.append(TaskEntry(commit, test, rounds))
 
         return task_list
 
@@ -856,15 +856,15 @@ class SmartEzbench:
     def __remove_task_from_tasktree__(self, task_tree, commit, full_name, rounds):
         if commit.sha1 not in task_tree:
             return False
-        if full_name not in task_tree[commit.sha1]["benchmarks"]:
+        if full_name not in task_tree[commit.sha1]["tests"]:
             return False
 
-        task_tree[commit.sha1]["benchmarks"][full_name]['rounds'] -= rounds
+        task_tree[commit.sha1]["tests"][full_name]['rounds'] -= rounds
 
-        if task_tree[commit.sha1]["benchmarks"][full_name]['rounds'] <= 0:
-            del task_tree[commit.sha1]["benchmarks"][full_name]
+        if task_tree[commit.sha1]["tests"][full_name]['rounds'] <= 0:
+            del task_tree[commit.sha1]["tests"][full_name]
 
-        if len(task_tree[commit.sha1]["benchmarks"]) == 0:
+        if len(task_tree[commit.sha1]["tests"]) == 0:
             del task_tree[commit.sha1]
 
         return True
@@ -903,17 +903,17 @@ class SmartEzbench:
         for commit in report.commits:
             for result in commit.results:
                 self.__log(Criticality.DD,
-                           "Found {count} runs for benchmark {benchmark} using commit {commit}".format(count=len(result.result()),
+                           "Found {count} runs for test {test} using commit {commit}".format(count=len(result.result()),
                                                                                                        commit=commit.sha1,
-                                                                                                       benchmark=result.benchmark.full_name))
+                                                                                                       test=result.test.full_name))
 
                 if result.test_type == "unit":
                     for run in result.runs:
                         for test in run:
-                            full_name = Benchmark.partial_name(result.benchmark.full_name, [test])
+                            full_name = Test.partial_name(result.test.full_name, [test])
                             self.__remove_task_from_tasktree__(task_tree, commit, full_name, 10^5) # FIXME: Read the actual round count?
                 else:
-                    self.__remove_task_from_tasktree__(task_tree, commit, result.benchmark.full_name, len(result.result()))
+                    self.__remove_task_from_tasktree__(task_tree, commit, result.test.full_name, len(result.result()))
 
         # Delete the tests on commits that do not compile
         for commit in report.commits:
@@ -949,14 +949,14 @@ class SmartEzbench:
                 return False
 
             self._task_current = e = self._task_list.pop(0)
-            short_name=e.benchmark[:80].rsplit('|', 1)[0]+'...'
+            short_name=e.test[:80].rsplit('|', 1)[0]+'...'
             self.__log(Criticality.DD,
-                       "make {count} runs for benchmark {benchmark} using commit {commit}".format(count=e.rounds,
+                       "make {count} runs for test {test} using commit {commit}".format(count=e.rounds,
                                                                                                   commit=e.commit,
-                                                                                                  benchmark=short_name))
+                                                                                                  test=short_name))
             self._task_current.started()
             self._task_lock.release()
-            run_info = ezbench.run_commits([e.commit], [e.benchmark + '$'], rounds=e.rounds)
+            run_info = ezbench.run_commits([e.commit], [e.test + '$'], rounds=e.rounds)
             self._task_lock.acquire()
 
             if run_info.success():
@@ -1034,15 +1034,15 @@ class SmartEzbench:
         self.__find_middle_commit__cache[key] = middle
         return middle
 
-    # WARNING: benchmark may be None!
-    def __score_event__(self, git_history, commit_sha1, benchmark, severity):
+    # WARNING: test may be None!
+    def __score_event__(self, git_history, commit_sha1, test, severity):
         commit_weight = 1 - (git_history.index(commit_sha1) / len(git_history))
 
-        bench_weight = 1
-        if benchmark is not None and hasattr(benchmark, 'score_weight'):
-            bench_weight = benchmark.score_weight
+        test_weight = 1
+        if test is not None and hasattr(test, 'score_weight'):
+            test_weight = test.score_weight
 
-        return commit_weight * bench_weight * severity
+        return commit_weight * test_weight * severity
 
     def schedule_enhancements(self, git_history=None, max_variance = 0.025,
                               perf_diff_confidence = 0.95, smallest_perf_change=0.005,
@@ -1076,10 +1076,10 @@ class SmartEzbench:
         tasks = []
         for e in r.events:
             commit_sha1 = None
-            benchmark = None
+            test = None
             event_prio = 1
             severity = 0 # should be a value in [0, 1]
-            bench_name_to_run = ""
+            test_name_to_run = ""
             runs = 0
             if type(e) is EventBuildBroken:
                 if e.commit_range.old is None or e.commit_range.is_single_commit():
@@ -1094,7 +1094,7 @@ class SmartEzbench:
                 commit_sha1 = middle
                 severity = 1
                 event_prio = 0.5
-                bench_name_to_run = "no-op"
+                test_name_to_run = "no-op"
                 runs = 1
             elif type(e) is EventBuildFixed:
                 if e.fixed_commit_range.is_single_commit():
@@ -1109,17 +1109,17 @@ class SmartEzbench:
                 commit_sha1 = middle
                 severity = 1
                 event_prio = 0.5
-                bench_name_to_run = "no-op"
+                test_name_to_run = "no-op"
                 runs = 1
             elif type(e) is EventPerfChange:
                 if e.commit_range.is_single_commit():
                     continue
 
                 # ignore commits which have a big variance
-                result_new = r.find_result(e.commit_range.new, e.benchmark).result()
+                result_new = r.find_result(e.commit_range.new, e.test).result()
                 if result_new.margin() > max_variance:
                     continue
-                result_old = r.find_result(e.commit_range.old, e.benchmark).result()
+                result_old = r.find_result(e.commit_range.old, e.test).result()
                 if result_old.margin() > max_variance:
                     continue
 
@@ -1133,20 +1133,20 @@ class SmartEzbench:
 
                 # Schedule the work
                 commit_sha1 = middle
-                benchmark = e.benchmark
+                test = e.test
                 severity = min(abs(e.diff()), 1) * e.confidence
                 event_prio = 0.75
 
-                bench_name_to_run = benchmark.full_name
+                test_name_to_run = test.full_name
                 runs = (len(result_old) + len(result_new)) / 2
             elif type(e) is EventInsufficientSignificance:
                 commit_sha1 = e.result.version.sha1
-                benchmark = e.result.test
+                test = e.result.test
                 missing_runs = max(2, e.wanted_n() - len(e.result)) # Schedule at least 2 more runs
                 severity = min(missing_runs / len(e.result), 1)
                 event_prio = 1
 
-                bench_name_to_run = benchmark.full_name
+                test_name_to_run = test.full_name
                 additional_runs = min(20, missing_runs) # cap the maximum amount of runs to play nice
 
                 # Make sure we do not schedule more than the maximum amount of run
@@ -1161,10 +1161,10 @@ class SmartEzbench:
 
                 # Check that the test was not unstable on either side of the change
                 if (e.commit_range.old.sha1 in unstable_unittests and
-                    str(e.bench_sub_test) in unstable_unittests[e.commit_range.old.sha1]):
+                    str(e.subtest_name) in unstable_unittests[e.commit_range.old.sha1]):
                     continue
                 if (e.commit_range.new.sha1 in unstable_unittests and
-                    str(e.bench_sub_test) in unstable_unittests[e.commit_range.new.sha1]):
+                    str(e.subtest_name) in unstable_unittests[e.commit_range.new.sha1]):
                     continue
 
                 # Find the middle commit
@@ -1178,7 +1178,7 @@ class SmartEzbench:
                 commit_sha1 = middle
                 severity = 1
                 event_prio = 1
-                bench_name_to_run = str(e.bench_sub_test)
+                test_name_to_run = str(e.subtest_name)
                 runs = 1
             elif type(e) is EventRenderingChange:
                 if e.commit_range.is_single_commit():
@@ -1194,20 +1194,20 @@ class SmartEzbench:
 
                 # Schedule the work
                 commit_sha1 = middle
-                benchmark = e.benchmark
+                test = e.test
                 severity = 1
                 event_prio = 1
 
-                bench_name_to_run = benchmark.full_name
+                test_name_to_run = test.full_name
                 runs = 1
             else:
                 print("schedule_enhancements: unknown event type {}".format(type(e).__name__))
                 continue
 
-            score = self.__score_event__(commits_rev_order, commit_sha1, benchmark, severity)
+            score = self.__score_event__(commits_rev_order, commit_sha1, test, severity)
             score *= event_prio
 
-            tasks.append((score, commit_sha1, bench_name_to_run, runs, e))
+            tasks.append((score, commit_sha1, test_name_to_run, runs, e))
 
         # If we are using the throttle mode, only schedule the commit with the
         # biggest score to speed up bisecting of the most important issues
@@ -1220,7 +1220,7 @@ class SmartEzbench:
             added = 0
             for t in tasks_sorted:
                 if t[1] == commit:
-                    added += self.__force_benchmark_rounds_unlocked__(t[1], t[2], t[3])
+                    added += self.__force_test_rounds_unlocked__(t[1], t[2], t[3])
             if added > 0:
                 self.__log(Criticality.II, "{}".format(t[4]))
                 scheduled_commits += 1
@@ -1234,7 +1234,7 @@ class SmartEzbench:
         self.__log(Criticality.II, "Done enhancing the report")
 
 # Report parsing
-class Benchmark:
+class Test:
     def __init__(self, full_name, unit="undefined"):
         self.full_name = full_name
         self.prevValue = -1
@@ -1246,7 +1246,7 @@ class Benchmark:
         idx = full_name.find('[')
         if idx > 0:
             if full_name[-1] != ']':
-                print("WARNING: benchmark name '{}' is invalid.".format(full_name))
+                print("WARNING: test name '{}' is invalid.".format(full_name))
 
             basename = full_name[0 : idx]
             subtests = full_name[idx + 1 : -1].split('|')
@@ -1343,7 +1343,7 @@ class ListStats:
         wanted_samples = 2
 
         if wanted_margin is not None:
-            # TODO: Get sigma from the benchmark instead!
+            # TODO: Get sigma from the test instead!
             sigma = (self._cache_std[1][1] - self._cache_std[1][0]) / 2
             target_margin = self._cache_mean[0] * wanted_margin
             wanted_samples = math.ceil(self.__samples_needed__(sigma,
@@ -1720,14 +1720,14 @@ class SubTestResult:
         WARNING: Does not work when the type is SUBTEST_STRING
         """
         if self.value_type != BenchSubTestType.METRIC:
-            return Benchmark.partial_name(self.test.full_name, [self.key])
+            return Test.partial_name(self.test.full_name, [self.key])
         else:
             return None
 
 class TestResult:
-    def __init__(self, commit, benchmark, testType, testFile, runFiles, metricsFiles):
+    def __init__(self, commit, test, testType, testFile, runFiles, metricsFiles):
         self.commit = commit
-        self.benchmark = benchmark
+        self.test = test
         self.test_file = testFile
 
         self.runs = []
@@ -1750,15 +1750,15 @@ class TestResult:
             unit_str = "FPS"
         self.unit_str = unit_str
 
-        # Check that we have the same unit as the benchmark
-        if self.benchmark.unit_str != self.unit_str:
-            if self.benchmark.unit_str != "undefined":
-                msg = "The unit used by the benchmark '{bench}' changed from '{unit_old}' to '{unit_new}' in commit {commit}"
-                print(msg.format(bench=bench_name,
-                                unit_old=benchmark.unit_str,
+        # Check that we have the same unit as the test
+        if self.test.unit_str != self.unit_str:
+            if self.test.unit_str != "undefined":
+                msg = "The unit used by the test '{test}' changed from '{unit_old}' to '{unit_new}' in commit {commit}"
+                print(msg.format(test=test.full_name,
+                                unit_old=test.unit_str,
                                 unit_new=self.unit_str,
                                 commit=commit.sha1))
-            self.benchmark.unit_str = unit_str
+            self.test.unit_str = unit_str
 
         for i in range(0, len(runFiles)):
             run = TestRun(self, testType, runFiles[i], metricsFiles[runFiles[i]], unit_str, data[i])
@@ -1774,7 +1774,7 @@ class TestResult:
         if key not in self._cache_result:
             if len(self.runs) == 0:
                 raise ValueError('Cannot get the results when there are no runs ({})'.format(self.test_file))
-            self._cache_result[key] = SubTestResult(self.commit, self.benchmark, key, self.runs)
+            self._cache_result[key] = SubTestResult(self.commit, self.test, key, self.runs)
         return self._cache_result[key]
 
     def results(self, restrict_to_type = None):
@@ -2004,8 +2004,8 @@ class EventBuildFixed:
         return "{} ({})".format(main, parenthesis)
 
 class EventPerfChange:
-    def __init__(self, benchmark, commit_range, old_perf, new_perf, confidence):
-        self.benchmark = benchmark
+    def __init__(self, test, commit_range, old_perf, new_perf, confidence):
+        self.test = test
         self.commit_range = commit_range
         self.old_perf = old_perf
         self.new_perf = new_perf
@@ -2021,7 +2021,7 @@ class EventPerfChange:
 
     def __str__(self):
         msg = "{} changed the performance of {} from {:.2f} to {:.2f} ({:+.2f}%) with confidence p={:.2f}"
-        return msg.format(self.commit_range, self.benchmark.full_name,
+        return msg.format(self.commit_range, self.test.full_name,
                           self.old_perf, self.new_perf, self.diff() * 100,
                           self.confidence)
 
@@ -2038,20 +2038,20 @@ class EventInsufficientSignificance:
 
     def __str__(self):
         margin, wanted_n = self.result.confidence_margin(self.wanted_margin)
-        msg = "Benchmark {} on commit {} requires more runs to reach the wanted margin ({:.2f}% vs {:.2f}%), proposes n = {}."
+        msg = "Test {} on commit {} requires more runs to reach the wanted margin ({:.2f}% vs {:.2f}%), proposes n = {}."
         return msg.format(self.result.test.full_name, self.result.version.sha1,
                           margin * 100, self.wanted_margin * 100, wanted_n)
 
 class EventUnitResultChange:
-    def __init__(self, bench_sub_test, commit_range, old_status, new_status):
-        self.bench_sub_test = bench_sub_test
+    def __init__(self, subtest_name, commit_range, old_status, new_status):
+        self.subtest_name = subtest_name
         self.commit_range = commit_range
         self.old_status = old_status
         self.new_status = new_status
 
     def __str__(self):
         msg = "{} changed the status of {} from {} to {}"
-        return msg.format(self.commit_range, self.bench_sub_test,
+        return msg.format(self.commit_range, self.subtest_name,
                           self.old_status, self.new_status)
 
 class EventUnitResultUnstable:
@@ -2068,7 +2068,7 @@ class Report:
         self.log_folder = log_folder
         self.name = log_folder.split(os.sep)[-1]
 
-        self.benchmarks = list()
+        self.tests = list()
         self.commits = list()
         self.notes = list()
         self.events = list()
@@ -2130,11 +2130,11 @@ class Report:
         # Find all the result files and sort them by sha1
         files_list = os.listdir()
         testFiles = dict()
-        commit_bench_file_re = re.compile(r'^(.+)_(bench|unit)_[^\.]+(.metrics_[^\.]+)?$')
+        commit_test_file_re = re.compile(r'^(.+)_(bench|unit)_[^\.]+(.metrics_[^\.]+)?$')
         for f in files_list:
             if os.path.isdir(f):
                 continue
-            m = commit_bench_file_re.match(f)
+            m = commit_test_file_re.match(f)
             if m is not None:
                 sha1 = m.groups()[0]
                 if sha1 not in testFiles:
@@ -2158,14 +2158,14 @@ class Report:
             commit = Commit(sha1, full_name, label)
 
             # Add the commit to the list of commits
-            commit.results = sorted(commit.results, key=lambda res: res.benchmark.full_name)
+            commit.results = sorted(commit.results, key=lambda res: res.test.full_name)
             self.commits.append(commit)
 
             # If there are no results, just continue
             if sha1 not in testFiles:
                 continue
 
-            # find all the benchmarks
+            # find all the tests
             for testFile, testType in testFiles[sha1]:
                 # Skip when the file is a run file (finishes by #XX)
                 if re.search(r'#\d+$', testFile) is not None:
@@ -2175,15 +2175,15 @@ class Report:
                 if "." in testFile:
                     continue
 
-                # Get the bench name
-                bench_name = testFile[len(commit.sha1) + len(testType) + 2:]
+                # Get the test name
+                test_name = testFile[len(commit.sha1) + len(testType) + 2:]
 
-                # Find the right Benchmark or create one if none are found
+                # Find the right Test or create one if none are found
                 try:
-                    benchmark = next(b for b in self.benchmarks if b.full_name == bench_name)
+                    test = next(b for b in self.tests if b.full_name == test_name)
                 except StopIteration:
-                    benchmark = Benchmark(bench_name)
-                    self.benchmarks.append(benchmark)
+                    test = Test(test_name)
+                    self.tests.append(test)
 
                 # Look for the runs
                 run_re = re.compile(r'^{testFile}#[0-9]+$'.format(testFile=testFile))
@@ -2200,7 +2200,7 @@ class Report:
 
                 # Create the result object
                 try:
-                    result = TestResult(commit, benchmark, testType, testFile, runsFiles, metricsFiles)
+                    result = TestResult(commit, test, testType, testFile, runsFiles, metricsFiles)
 
                     # Add the result to the commit's results
                     commit.results.append(result)
@@ -2208,8 +2208,8 @@ class Report:
                 except:
                     pass
 
-        # Sort the list of benchmarks
-        self.benchmarks = sorted(self.benchmarks, key=lambda bench: bench.full_name)
+        # Sort the list of tests
+        self.tests = sorted(self.tests, key=lambda test: test.full_name)
 
         # Read the notes before going back to the original folder
         notes = self.__readNotes__()
@@ -2223,9 +2223,9 @@ class Report:
                 return commit
         return None
 
-    def find_result(self, commit, benchmark):
+    def find_result(self, commit, test):
         for result in commit.results:
-            if result.benchmark == benchmark:
+            if result.test == test:
                 return result
         return None
 
@@ -2249,7 +2249,7 @@ class Report:
 
         # Generate events
         commit_prev = None
-        bench_prev = dict()
+        test_prev = dict()
         unittest_prev = dict()
         build_broken_since = None
         for commit in self.commits:
@@ -2267,8 +2267,8 @@ class Report:
             for testresult in commit.results:
                 for result_key in testresult.results():
                     result = testresult.result(result_key)
-                    bench = result.test.full_name
-                    bench_unit = result.test.unit_str
+                    test = result.test.full_name
+                    test_unit = result.test.unit_str
 
                     if result.value_type == BenchSubTestType.SUBTEST_FLOAT:
                         if result.margin() > max_variance:
@@ -2278,21 +2278,21 @@ class Report:
                         if len(commits_rev_order) == 0:
                             continue
 
-                        if bench in bench_prev:
+                        if test in test_prev:
                             # We got previous perf results, compare!
-                            old_perf = bench_prev[bench]
+                            old_perf = test_prev[test]
                             diff, confidence = result.compare(old_perf)
 
                             # If we are not $perf_diff_confidence sure that this is the
                             # same normal distribution, say that the performance changed
                             if confidence >= perf_diff_confidence and diff >= smallest_perf_change:
-                                commit_range = EventCommitRange(bench_prev[bench].version, commit)
+                                commit_range = EventCommitRange(test_prev[test].version, commit)
                                 self.events.append(EventPerfChange(result.test,
                                                                 commit_range,
                                                                 old_perf.mean(),
                                                                 result.mean(),
                                                                 confidence))
-                        bench_prev[bench] = result
+                        test_prev[test] = result
                     elif result.value_type == BenchSubTestType.SUBTEST_STRING:
                         subtest_name = result.subtest_fullname()
 
@@ -2348,11 +2348,11 @@ def readCsv(filepath):
                 m1 = h1.match(row[0])
                 m2 = h2.match(row[0])
                 if m2 is not None:
-                    # groups: unit type, more|less qualifier, benchmark, commit/version, commit_sha1
+                    # groups: unit type, more|less qualifier, test, commit/version, commit_sha1
                     unit = m2.groups()[0]
                     more_is_better = m2.groups()[1].lower() == "more"
                 elif m1 is not None:
-                    # groups: unit type, benchmark, commit_sha1
+                    # groups: unit type, test, commit_sha1
                     unit = m1.groups()[0]
 
                 # Read the actual data
@@ -2376,16 +2376,16 @@ def readUnitRun(filepath):
                 tests[fields[0]] = fields[1].strip()
     return tests
 
-def getPerformanceResultsCommitBenchmark(commit, benchmark):
+def getPerformanceResultsCommitTest(commit, test):
     for result in commit.results:
-        if result.benchmark != benchmark:
+        if result.test != test:
             continue
 
         return array(result.data)
 
     return array([])
 
-def getResultsBenchmarkDiffs(commits, benchmark):
+def getResultsTestDiffs(commits, test):
     results = []
 
     # Compute a report per application
@@ -2394,7 +2394,7 @@ def getResultsBenchmarkDiffs(commits, benchmark):
     for commit in commits:
         resultFound = False
         for result in commit.results:
-            if result.benchmark != benchmark:
+            if result.test != test:
                 continue
 
             value = array(result.data).mean()

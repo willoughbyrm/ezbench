@@ -51,13 +51,13 @@ def break_lists(input_list, sep=" "):
 
 # parse the options
 parser = argparse.ArgumentParser()
-parser.add_argument("-b", dest='benchmarks', help="<benchmark regexp> include these benchmarks to run",
+parser.add_argument("-b", dest='tests', help="<test regexp> include these tests to run",
                     action="append")
-parser.add_argument("-B", dest='benchmarks_exclude', help="<benchmark regexp> exclude these benchamrks from running",
+parser.add_argument("-B", dest='tests_exclude', help="<test regexp> exclude these benchamrks from running",
                     action="append")
 parser.add_argument("-t", dest='testsets', help="Test sets to run", action="append")
 parser.add_argument("-T", dest='list_testsets', help="List the available testsets", action="store_true")
-parser.add_argument("-c", dest='commits', help="Commits to run the benchmarks on",
+parser.add_argument("-c", dest='commits', help="Commits to run the tests on",
                     action="append")
 parser.add_argument("-r", dest='rounds', help="Number of execution rounds",
                     action="store", type=int, nargs='?')
@@ -87,7 +87,7 @@ if args.testsets is not None:
     testsets = list(set(break_lists(args.testsets)))
 
     ezbench = Ezbench(ezbench_dir=ezbench_dir)
-    benchmarks = ezbench.available_benchmarks()
+    tests = ezbench.available_tests()
 
     # Check all the testsets
     for name in testsets:
@@ -95,7 +95,7 @@ if args.testsets is not None:
         if testset is None:
             print("Cannot find a test set named '{}'".format(name))
             sys.exit(1)
-        if not testset.parse(benchmarks):
+        if not testset.parse(tests):
             print("Invalid test set named {}, abort...".format(name))
             sys.exit(1)
 
@@ -116,31 +116,31 @@ sbench = SmartEzbench(ezbench_dir, args.report_name)
 if sbench.profile() is None and args.profile is not None:
     sbench.set_profile(args.profile)
 
-# add commits and benchmarks
-if args.commits is not None and args.benchmarks is not None:
+# add commits and tests
+if args.commits is not None and args.tests is not None:
     # remove duplicates in the lists
     commits = list(set(break_lists(args.commits)))
-    benchmarks = list(set(break_lists(args.benchmarks)))
-    benchmarks_exclude = list(set(break_lists(args.benchmarks_exclude)))
+    tests = list(set(break_lists(args.tests)))
+    tests_exclude = list(set(break_lists(args.tests_exclude)))
 
     # we cannot fetch the git sha1 without a profile/git repo
     if sbench.profile() is None:
-        print("No profile is set, set one first with -p before adding benchmark runs")
+        print("No profile is set, set one first with -p before adding test runs")
         sys.exit(1)
 
-    # get the list of benchmarks that actually need to be ran
+    # get the list of tests that actually need to be ran
     ezbench = Ezbench(ezbench_dir=ezbench_dir,
                   profile=sbench.profile(),
                   report_name="tmp")
-    run_info = ezbench.run_commits(commits, benchmarks, benchmarks_exclude, dry_run=True)
+    run_info = ezbench.run_commits(commits, tests, tests_exclude, dry_run=True)
     if not run_info.success():
         sys.exit(1)
 
-    # Add all the commits and benchmarks to commit
+    # Add all the commits and tests to commit
     for commit in run_info.commits:
-        for bench in run_info.benchmarks:
-            print("add {count} runs to {bench} on {commit}".format(count=args.rounds, bench=bench, commit=commit))
-            sbench.add_benchmark(commit, bench, args.rounds)
+        for test in run_info.tests:
+            print("add {count} runs to {test} on {commit}".format(count=args.rounds, test=test, commit=commit))
+            sbench.add_test(commit, test, args.rounds)
 
 if args.commits is not None and len(testsets_to_be_added) > 0:
     # remove duplicates in the lists
@@ -148,10 +148,10 @@ if args.commits is not None and len(testsets_to_be_added) > 0:
 
     # we cannot fetch the git sha1 without a profile/git repo
     if sbench.profile() is None:
-        print("No profile is set, set one first with -p before adding benchmark runs")
+        print("No profile is set, set one first with -p before adding test runs")
         sys.exit(1)
 
-    # get the list of benchmarks that actually need to be ran
+    # get the list of tests that actually need to be ran
     ezbench = Ezbench(ezbench_dir=ezbench_dir,
                   profile=sbench.profile(),
                   report_name="tmp")
