@@ -132,7 +132,7 @@ if args.commits is not None and args.tests is not None:
     ezbench = Ezbench(ezbench_dir=ezbench_dir,
                   profile=sbench.profile(),
                   report_name="tmp")
-    run_info = ezbench.run_commits(commits, tests, tests_exclude, dry_run=True)
+    run_info = ezbench.run(commits, tests, tests_exclude, dry_run=True)
     if not run_info.success():
         sys.exit(1)
 
@@ -155,7 +155,7 @@ if args.commits is not None and len(testsets_to_be_added) > 0:
     ezbench = Ezbench(ezbench_dir=ezbench_dir,
                   profile=sbench.profile(),
                   report_name="tmp")
-    run_info = ezbench.run_commits(commits, [], dry_run=True)
+    run_info = ezbench.run(commits, [], dry_run=True)
     if not run_info.success():
         sys.exit(1)
 

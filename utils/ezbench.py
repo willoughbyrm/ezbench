@@ -229,7 +229,7 @@ class Ezbench:
 
         return EzbenchRun(commits, tests, versions, pred_exec_time, repo_type, repo_dir, head_commit, deployed_commit, exit_code)
 
-    def run_commits(self, commits, tests, test_excludes = [],
+    def run(self, commits, tests, test_excludes = [],
                     rounds = None, dry_run = False, verbose = False):
         ezbench_cmd, ezbench_stdin = self.__ezbench_cmd_base(tests, test_excludes, rounds, dry_run)
 
@@ -636,7 +636,7 @@ class SmartEzbench:
         if 'beenRunBefore' not in self.state or self.state['beenRunBefore'] == False:
             # Check that the profile exists!
             ezbench = self.__create_ezbench(profile = profile)
-            run_info = ezbench.run_commits(["HEAD"], [], [], dry_run=True)
+            run_info = ezbench.run(["HEAD"], [], [], dry_run=True)
             if not run_info.success():
                 if run_info.exit_code == EzbenchExitCode.ARG_PROFILE_INVALID:
                     self.__log(Criticality.EE,
@@ -889,7 +889,7 @@ class SmartEzbench:
 
         # Create the ezbench runner
         ezbench = self.__create_ezbench()
-        run_info = ezbench.run_commits(["HEAD"], [], [], dry_run=True)
+        run_info = ezbench.run(["HEAD"], [], [], dry_run=True)
         self.__log(Criticality.II, "    - Deployed version: '{0}'".format(run_info.deployed_commit))
         self.__log(Criticality.II, "All the dependencies are met, generate a report...")
 
@@ -956,7 +956,7 @@ class SmartEzbench:
                                                                                                   test=short_name))
             self._task_current.started()
             self._task_lock.release()
-            run_info = ezbench.run_commits([e.commit], [e.test + '$'], rounds=e.rounds)
+            run_info = ezbench.run([e.commit], [e.test + '$'], rounds=e.rounds)
             self._task_lock.acquire()
 
             if run_info.success():
@@ -984,7 +984,7 @@ class SmartEzbench:
 
         # Get the repo directory
         ezbench = self.__create_ezbench()
-        run_info = ezbench.run_commits(["HEAD"], [], [], dry_run=True)
+        run_info = ezbench.run(["HEAD"], [], [], dry_run=True)
 
         if not run_info.success() or run_info.repo_dir == '':
             return git_history
