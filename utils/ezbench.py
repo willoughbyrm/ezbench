@@ -80,10 +80,10 @@ class EzbenchExitCode(Enum):
     UNK_ERROR = 255
 
 class EzbenchRun:
-    def __init__(self, commits, tests, versions, predicted_execution_time, repo_type, repo_dir, repo_head, deployed_commit, exit_code):
+    def __init__(self, commits, tests, avail_versions, predicted_execution_time, repo_type, repo_dir, repo_head, deployed_commit, exit_code):
         self.commits = commits
         self.tests = tests
-        self.versions = versions
+        self.avail_versions = avail_versions
         self.predicted_execution_time = predicted_execution_time
         self.repo_type = repo_type
         self.repo_dir = repo_dir
@@ -193,7 +193,7 @@ class Ezbench:
         # we need to parse the output
         commits= []
         tests = []
-        versions = []
+        avail_versions = []
         pred_exec_time = 0
         deployed_commit = ""
         repo_type = ""
@@ -209,7 +209,7 @@ class Ezbench:
             elif line.startswith("Available tests:"):
                 tests = line[17:].split(" ")
             elif line.startswith("Available versions:"):
-                versions = line[19:].strip().split(" ")
+                avail_versions = line[19:].strip().split(" ")
             elif line.find("estimated finish date:") >= 0:
                 pred_exec_time = ""
             elif m_repo is not None:
@@ -227,7 +227,7 @@ class Ezbench:
         if exit_code != EzbenchExitCode.NO_ERROR:
             print("\n\nERROR: The following command '{}' failed with the error code {}. Here is its output:\n\n'{}'".format(" ".join(cmd), exit_code, output))
 
-        return EzbenchRun(commits, tests, versions, pred_exec_time, repo_type, repo_dir, head_commit, deployed_commit, exit_code)
+        return EzbenchRun(commits, tests, avail_versions, pred_exec_time, repo_type, repo_dir, head_commit, deployed_commit, exit_code)
 
     def run(self, commits, tests, test_excludes = [],
                     rounds = None, dry_run = False, verbose = False):
@@ -244,7 +244,7 @@ class Ezbench:
 
     def available_versions(self):
         ezbench_cmd, ezbench_stdin = self.__ezbench_cmd_base(list_built_versions = True)
-        return self.__run_ezbench(ezbench_cmd, ezbench_stdin).versions
+        return self.__run_ezbench(ezbench_cmd, ezbench_stdin).avail_versions
 
     def reportIsLocked(self):
         if self.report_name is None:
