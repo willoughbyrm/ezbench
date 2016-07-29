@@ -1276,6 +1276,7 @@ class ListStats:
         self._cache_result = None
         self._cache_mean = None
         self._cache_std = None
+        self._cache_mean_simple = None
 
     def invalidate_cache(self):
         """ Trash the cache, necessary if you manually update the data (BAD!) """
@@ -1355,8 +1356,15 @@ class ListStats:
     def mean(self):
         """ Computes the mean of the data set """
 
-        self.__compute_stats__()
-        return self._cache_mean[0]
+        if self._cache_mean is not None:
+            return self._cache_mean[0]
+
+        if self._cache_mean_simple is None:
+            if len(self.data) > 0:
+                self._cache_mean_simple = sum(self.data) / len(self.data)
+            else:
+                self._cache_mean_simple = 0
+        return self._cache_mean_simple
 
     def compare(self, distrib_b, equal_var=True):
         """
