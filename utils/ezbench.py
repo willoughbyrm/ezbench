@@ -1069,7 +1069,7 @@ class SmartEzbench:
             if type(e) is EventUnitResultUnstable:
                 if e.commit.sha1 not in unstable_unittests:
                     unstable_unittests[e.commit.sha1] = set()
-                unstable_unittests[e.result.version.sha1] |= set([str(e.result.subtest_fullname())])
+                unstable_unittests[e.result.commit.sha1] |= set([str(e.result.subtest_fullname())])
         self.__log(Criticality.DD, "Unstable tests: {}".format(str(unstable_unittests)))
 
         # Check all events
@@ -1140,7 +1140,7 @@ class SmartEzbench:
                 test_name_to_run = test.full_name
                 runs = (len(result_old) + len(result_new)) / 2
             elif type(e) is EventInsufficientSignificance:
-                commit_sha1 = e.result.version.sha1
+                commit_sha1 = e.result.commit.sha1
                 test = e.result.test
                 missing_runs = max(2, e.wanted_n() - len(e.result)) # Schedule at least 2 more runs
                 severity = min(missing_runs / len(e.result), 1)
@@ -1592,8 +1592,8 @@ class TestRun:
 
 
 class SubTestResult:
-    def __init__(self, version, test, key, runs):
-        self.version = version
+    def __init__(self, commit, test, key, runs):
+        self.commit = commit
         self.test = test
         self.key = key
         self.runs = runs
@@ -2039,7 +2039,7 @@ class EventInsufficientSignificance:
     def __str__(self):
         margin, wanted_n = self.result.confidence_margin(self.wanted_margin)
         msg = "Test {} on commit {} requires more runs to reach the wanted margin ({:.2f}% vs {:.2f}%), proposes n = {}."
-        return msg.format(self.result.test.full_name, self.result.version.sha1,
+        return msg.format(self.result.test.full_name, self.result.commit.sha1,
                           margin * 100, self.wanted_margin * 100, wanted_n)
 
 class EventUnitResultChange:
@@ -2060,7 +2060,7 @@ class EventUnitResultUnstable:
 
     def __str__(self):
         msg = "Unstable result on version {} for {} (got {})"
-        return msg.format(self.result.version.sha1, self.result.subtest_fullname(),
+        return msg.format(self.result.commit.sha1, self.result.subtest_fullname(),
                           self.result.to_set())
 
 class Report:
@@ -2286,7 +2286,7 @@ class Report:
                             # If we are not $perf_diff_confidence sure that this is the
                             # same normal distribution, say that the performance changed
                             if confidence >= perf_diff_confidence and diff >= smallest_perf_change:
-                                commit_range = EventCommitRange(test_prev[test].version, commit)
+                                commit_range = EventCommitRange(test_prev[test].commit, commit)
                                 self.events.append(EventPerfChange(result.test,
                                                                 commit_range,
                                                                 old_perf.mean(),
@@ -2315,7 +2315,7 @@ class Report:
                         if subtest_name in unittest_prev:
                             before = unittest_prev[subtest_name]
                             if before[0] != result[0]:
-                                commit_range = EventCommitRange(unittest_prev[subtest_name].version, commit)
+                                commit_range = EventCommitRange(unittest_prev[subtest_name].commit, commit)
                                 self.events.append(EventUnitResultChange(subtest_name, commit_range, before[0], result[0]))
 
                         unittest_prev[subtest_name] = result
