@@ -2014,7 +2014,7 @@ class EventInsufficientSignificance(EventResultNeedsMoreRuns):
     def __str__(self):
         msg = "Test {} on commit {} requires more runs to reach the wanted margin ({:.2f}% vs {:.2f}%), proposes n = {}."
         return msg.format(self.result.test.full_name, self.result.commit.sha1,
-                          self.margin() * 100, self.wanted_margin * 100, self.wanted_n)
+                          self.margin() * 100, self.wanted_margin * 100, self.wanted_n())
 
 class EventUnitResultChange:
     def __init__(self, subtest_name, commit_range, old_result, new_result):
