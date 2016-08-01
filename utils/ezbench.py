@@ -427,7 +427,7 @@ class TaskEntry:
         self.start_date = datetime.now()
 
     def set_timing_information(self, timingsDB):
-        time = timingsDB.data("benchmark", self.test)
+        time = timingsDB.data("test", self.test)
         if len(time) > 0:
             self.exec_time = statistics.median(time)
         else:
