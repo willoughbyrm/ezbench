@@ -1135,14 +1135,13 @@ class SmartEzbench:
 
                 test_name_to_run = test.full_name
                 runs = (len(result_old) + len(result_new)) / 2
-            elif type(e) is EventInsufficientSignificance:
+            elif isinstance(e, EventResultNeedsMoreRuns):
                 commit_sha1 = e.result.commit.sha1
-                test = e.result.test
-                missing_runs = max(2, e.wanted_n() - len(e.result)) # Schedule at least 2 more runs
+                missing_runs = max(1, e.wanted_n() - len(e.result)) # Schedule at least 1 more runs
                 severity = min(missing_runs / len(e.result), 1)
                 event_prio = 1
 
-                test_name_to_run = test.full_name
+                test_name_to_run = e.result.subtest_fullname()
                 additional_runs = min(20, missing_runs) # cap the maximum amount of runs to play nice
 
                 # Make sure we do not schedule more than the maximum amount of run
@@ -1175,7 +1174,7 @@ class SmartEzbench:
                 severity = 1
                 event_prio = 1
                 test_name_to_run = str(e.subtest_name)
-                runs = 1
+                runs = math.ceil((len(e.old_result) + len(e.new_result)) / 2)
             else:
                 print("schedule_enhancements: unknown event type {}".format(type(e).__name__))
                 continue
@@ -2009,22 +2008,31 @@ class EventPerfChange:
                           self.old_perf, self.new_perf, self.diff() * 100,
                           self.confidence)
 
-class EventInsufficientSignificance:
-    def __init__(self, result, wanted_margin):
+class EventResultNeedsMoreRuns:
+    def __init__(self, result, wanted_n):
         self.result = result
+        self._wanted_n = wanted_n
+
+    def wanted_n(self):
+        return self._wanted_n
+
+    def __str__(self):
+        msg = "Result {} on commit {} requires at least {} runs."
+        return msg.format(self.result.subtest_fullname(), self.result.commit.sha1,
+                          self.wanted_n())
+
+class EventInsufficientSignificance(EventResultNeedsMoreRuns):
+    def __init__(self, result, wanted_margin):
+        super().__init__(result, result.confidence_margin(wanted_margin)[1])
         self.wanted_margin = wanted_margin
 
     def margin(self):
         return self.result.confidence_margin(self.wanted_margin)[0]
 
-    def wanted_n(self):
-        return self.result.confidence_margin(self.wanted_margin)[1]
-
     def __str__(self):
-        margin, wanted_n = self.result.confidence_margin(self.wanted_margin)
         msg = "Test {} on commit {} requires more runs to reach the wanted margin ({:.2f}% vs {:.2f}%), proposes n = {}."
         return msg.format(self.result.test.full_name, self.result.commit.sha1,
-                          margin * 100, self.wanted_margin * 100, wanted_n)
+                          self.margin() * 100, self.wanted_margin * 100, self.wanted_n)
 
 class EventUnitResultChange:
     def __init__(self, subtest_name, commit_range, old_status, new_status):
