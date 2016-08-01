@@ -115,7 +115,7 @@ function run_bench {
 
     # If the test does not have subtests, then store the execution time
     if [ -z "$benchSubtests" ]; then
-        "$ezBenchDir/timing_DB/timing.py" -n benchmark -k "$benchName" -a $test_exec_time
+        "$ezBenchDir/timing_DB/timing.py" -n test -k "$benchName" -a $test_exec_time
     fi
 
     if [ -f "$env_dump_path" ]; then
