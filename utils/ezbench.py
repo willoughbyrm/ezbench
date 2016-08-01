@@ -2290,7 +2290,7 @@ class Report:
                         # element due to the test above
                         if subtest_name in unittest_prev:
                             before = unittest_prev[subtest_name]
-                            if before[0] != result[0]:
+                            if before is not None and before[0] != result[0]:
                                 if len(before) < 2:
                                     self.events.append(EventResultNeedsMoreRuns(before, 2))
                                 if len(result) < 2:
