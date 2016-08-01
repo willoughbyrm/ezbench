@@ -37,9 +37,6 @@ More investigation needs to be made.
  deduce the variance of it. This will be used by smart ezbench to figure out how
  many runs are necessary.
 
- - Output multiple metrics, possibly under the name
- ${commit}_bench_${benchmark}.${metric}_metric
-
 === Reset the environment to a previously-used one ===
 
 When wanting to add data to a certain commit, we need to check the environment
