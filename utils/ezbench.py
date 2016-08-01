@@ -1180,26 +1180,6 @@ class SmartEzbench:
                 event_prio = 1
                 test_name_to_run = str(e.subtest_name)
                 runs = 1
-            elif type(e) is EventRenderingChange:
-                if e.commit_range.is_single_commit():
-                    continue
-
-                middle = self.__find_middle_commit__(commits_rev_order,
-                                                     e.commit_range.old.sha1,
-                                                     e.commit_range.new.sha1)
-                if middle is None:
-                    continue
-
-                # FIXME: handle the case where the middle commit refuses to build
-
-                # Schedule the work
-                commit_sha1 = middle
-                test = e.test
-                severity = 1
-                event_prio = 1
-
-                test_name_to_run = test.full_name
-                runs = 1
             else:
                 print("schedule_enhancements: unknown event type {}".format(type(e).__name__))
                 continue
