@@ -2017,11 +2017,13 @@ class EventInsufficientSignificance(EventResultNeedsMoreRuns):
                           self.margin() * 100, self.wanted_margin * 100, self.wanted_n)
 
 class EventUnitResultChange:
-    def __init__(self, subtest_name, commit_range, old_status, new_status):
+    def __init__(self, subtest_name, commit_range, old_result, new_result):
         self.subtest_name = subtest_name
         self.commit_range = commit_range
-        self.old_status = old_status
-        self.new_status = new_status
+        self.old_result = old_result
+        self.new_result = new_result
+        self.old_status = old_result[0]
+        self.new_status = new_result[0]
 
     def __str__(self):
         msg = "{} changed the status of {} from {} to {}"
@@ -2290,7 +2292,10 @@ class Report:
                             before = unittest_prev[subtest_name]
                             if before[0] != result[0]:
                                 commit_range = EventCommitRange(unittest_prev[subtest_name].commit, commit)
-                                self.events.append(EventUnitResultChange(subtest_name, commit_range, before[0], result[0]))
+                                self.events.append(EventUnitResultChange(subtest_name,
+                                                                            commit_range,
+                                                                            before,
+                                                                            result))
 
                         unittest_prev[subtest_name] = result
 
