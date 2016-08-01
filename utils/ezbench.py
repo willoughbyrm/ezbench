@@ -2291,11 +2291,16 @@ class Report:
                         if subtest_name in unittest_prev:
                             before = unittest_prev[subtest_name]
                             if before[0] != result[0]:
-                                commit_range = EventCommitRange(unittest_prev[subtest_name].commit, commit)
-                                self.events.append(EventUnitResultChange(subtest_name,
-                                                                            commit_range,
-                                                                            before,
-                                                                            result))
+                                if len(before) < 2:
+                                    self.events.append(EventResultNeedsMoreRuns(before, 2))
+                                if len(result) < 2:
+                                    self.events.append(EventResultNeedsMoreRuns(result, 2))
+                                if len(before) >= 2 and len(result) >= 2:
+                                    commit_range = EventCommitRange(unittest_prev[subtest_name].commit, commit)
+                                    self.events.append(EventUnitResultChange(subtest_name,
+                                                                                commit_range,
+                                                                                before,
+                                                                                result))
 
                         unittest_prev[subtest_name] = result
 
