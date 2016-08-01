@@ -1058,16 +1058,6 @@ class SmartEzbench:
         # report every time.
         self._report_cached = r
 
-        # Create a list of all the unstable tests
-        # TODO: Check that from the list of events instead of re-doing the work!
-        unstable_unittests = dict()
-        for e in r.events:
-            if type(e) is EventUnitResultUnstable:
-                if e.commit.sha1 not in unstable_unittests:
-                    unstable_unittests[e.commit.sha1] = set()
-                unstable_unittests[e.result.commit.sha1] |= set([str(e.result.subtest_fullname())])
-        self.__log(Criticality.DD, "Unstable tests: {}".format(str(unstable_unittests)))
-
         # Check all events
         tasks = []
         for e in r.events:
@@ -1152,14 +1142,6 @@ class SmartEzbench:
                         continue
             elif type(e) is EventUnitResultChange:
                 if e.commit_range.is_single_commit():
-                    continue
-
-                # Check that the test was not unstable on either side of the change
-                if (e.commit_range.old.sha1 in unstable_unittests and
-                    str(e.subtest_name) in unstable_unittests[e.commit_range.old.sha1]):
-                    continue
-                if (e.commit_range.new.sha1 in unstable_unittests and
-                    str(e.subtest_name) in unstable_unittests[e.commit_range.new.sha1]):
                     continue
 
                 # Find the middle commit
