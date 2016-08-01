@@ -194,7 +194,7 @@ profile="default"
 list_built_versions=0
 while getopts "$optString" opt; do
     case "$opt" in
-    k)
+    k|l)
         dry_run=1
         ;;
     P)  profile=$OPTARG
