@@ -1425,7 +1425,7 @@ class TestRun:
             # There are no subtests here
             data, unit, more_is_better = readCsv(runFile)
             if len(data) > 0:
-                result = SubTestFloat("samples", testResult.unit_str, data, runFile)
+                result = SubTestFloat("", testResult.unit_str, data, runFile)
                 self.__add_result__(result)
         elif testType == "unit":
             unit_tests = readUnitRun(runFile)
