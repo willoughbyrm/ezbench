@@ -907,13 +907,9 @@ class SmartEzbench:
                                                                                                        commit=commit.sha1,
                                                                                                        test=result.test.full_name))
 
-                if result.test_type == "unit":
-                    for run in result.runs:
-                        for test in run:
-                            full_name = Test.partial_name(result.test.full_name, [test])
-                            self.__remove_task_from_tasktree__(task_tree, commit, full_name, 10^5) # FIXME: Read the actual round count?
-                else:
-                    self.__remove_task_from_tasktree__(task_tree, commit, result.test.full_name, len(result.result()))
+                for key in result.results():
+                    full_name = Test.partial_name(result.test.full_name, [key])
+                    self.__remove_task_from_tasktree__(task_tree, commit, full_name, len(result.result(key)))
 
         # Delete the tests on commits that do not compile
         for commit in report.commits:
