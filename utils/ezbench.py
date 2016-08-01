@@ -2201,7 +2201,7 @@ class Report:
         # Go back to the original folder
         os.chdir(cwd)
 
-    def find_commit(self, sha1):
+    def find_commit_by_id(self, sha1):
         for commit in self.commits:
             if commit.sha1 == sha1:
                 return commit
