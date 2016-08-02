@@ -152,14 +152,14 @@ for e in report.events:
 
 		o_perf, o_variance, o_build, o_exec = commit_info(e.commit_range.old)
 		n_perf, n_variance, n_build, n_exec = commit_info(e.commit_range.new)
-		wanted = EventPerfChange(e.test, e.commit_range, o_perf, n_perf, 1.0)
+		wanted_diff = compute_perf_difference("fps", o_perf, n_perf) - 100
 
 		if (not o_exec and n_exec) or (o_exec and not n_exec):
 			if e.diff() != -1 and e.diff() != float("+inf"):
 				print("False positive: {} => real perf change was {} to {}".format(e, o_perf, n_perf))
 				false_positive += 1
 		else:
-			rel_error = abs(wanted.diff() - e.diff()) * 100.0
+			rel_error = abs(wanted_diff - e.diff() * 100.0)
 			relative_error.append(rel_error)
 			if o_perf == n_perf or rel_error > max_variance * 100.0:
 				print("False positive: {} => real perf change was {} to {}".format(e, o_perf, n_perf))

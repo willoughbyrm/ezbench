@@ -1969,25 +1969,26 @@ class EventBuildFixed:
         return "{} ({})".format(main, parenthesis)
 
 class EventPerfChange:
-    def __init__(self, test, commit_range, old_perf, new_perf, confidence):
+    def __init__(self, test, commit_range, old_result, new_result, confidence):
         self.test = test
         self.commit_range = commit_range
-        self.old_perf = old_perf
-        self.new_perf = new_perf
+        self.new_result = new_result
+        self.old_result = old_result
         self.confidence = confidence
 
     def diff(self):
-        if self.old_perf != 0:
-            return (1 - (self.new_perf / self.old_perf)) * -1
-        elif self.new_perf == 0 and self.old_perf == 0:
+        if self.old_result.mean() != 0:
+            return (1 - (self.new_result.mean() / self.old_result.mean())) * -1
+        elif self.new_result.mean() == 0 and self.old_result.mean() == 0:
             return 0
         else:
             return float("inf")
 
     def __str__(self):
-        msg = "{} changed the performance of {} from {:.2f} to {:.2f} ({:+.2f}%) with confidence p={:.2f}"
+        msg = "{} changed the performance of {} from {:.2f} to {:.2f} {} ({:+.2f}%) with confidence p={:.2f}"
         return msg.format(self.commit_range, self.test.full_name,
-                          self.old_perf, self.new_perf, self.diff() * 100,
+                          self.old_result.mean(), self.new_result.mean(),
+                          self.new_result.unit, self.diff() * 100,
                           self.confidence)
 
 class EventResultNeedsMoreRuns:
@@ -2265,8 +2266,7 @@ class Report:
                                 commit_range = EventCommitRange(test_prev[test].commit, commit)
                                 self.events.append(EventPerfChange(result.test,
                                                                 commit_range,
-                                                                old_perf.mean(),
-                                                                result.mean(),
+                                                                old_perf, result,
                                                                 confidence))
                         test_prev[test] = result
                     elif result.value_type == BenchSubTestType.SUBTEST_STRING:
