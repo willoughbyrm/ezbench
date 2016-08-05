@@ -62,6 +62,7 @@ def __env_add_result__(db, human_envs, report, commit, result):
 		r = EnvDumpReport(fullpath, False).to_set(['^DATE',
 													'^ENV.ENV_DUMP_FILE',
 													'^ENV.ENV_DUMP_METRIC_FILE',
+													'^ENV.EZBENCH_CONF_.*\.key$',
 													'_PID',
 													'SHA1$',
 													'.pid$',
