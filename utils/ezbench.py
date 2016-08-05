@@ -1372,6 +1372,16 @@ class SubTestFloat(SubTestBase):
 
         super().__init__(name, BenchSubTestType.SUBTEST_FLOAT, self.samples.mean(), unit, data_raw_file)
 
+    @classmethod
+    def to_string(cls, mean, unit, margin, n):
+        if n > 1:
+            return "{:.2f} {} +/- {:.2f}% (n={})".format(mean, unit, margin * 100, n)
+        else:
+            return "{:.2f} {}".format(mean, unit)
+
+    def __str__(self):
+        return self.to_string(self.samples.mean(), self.unit, self.samples.margin(), len(self.samples))
+
 class Metric(SubTestFloat):
     def __init__(self, name, unit, samples, timestamps = None, data_raw_file = None):
         super().__init__(name, unit, samples, data_raw_file)
@@ -1602,6 +1612,13 @@ class SubTestResult:
 
     def __getitem__(self, key):
         return self.to_list()[key]
+
+    def __str__(self):
+        if (self.value_type == BenchSubTestType.SUBTEST_FLOAT or
+                self.value_type == BenchSubTestType.METRIC):
+            return SubTestFloat.to_string(self.mean(), self.unit, self.margin(), len(self))
+        else:
+            return str(self.to_set())
 
     def to_list(self):
         """ Returns the list of all the mean values for every run """
