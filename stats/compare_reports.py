@@ -201,8 +201,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 					if metric not in db["metrics"][result.test.full_name]:
 						db["metrics"][result.test.full_name].append(metric)
 
-					metric_object = result.result(metric)
-					result.metrics[metric] = (metric_object.mean(), metric_object.unit)
+					result.metrics[metric] = result.result(metric)
 
 
 				# Environment
@@ -834,16 +833,14 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 							% endfor
 
 							% for metric in sorted(db["metrics"][test]):
-<% target_value = None %>\\
+<% ref_metric = None %>\\
 								<tr><td>${metric}</td>
 								% if 'reference' in db:
 									% if (test in db["target_result"] and (metric in db["target_result"][test].results(BenchSubTestType.METRIC))):
 									<%
 										ref_metric = db["target_result"][test].result(metric)
-										target_value = ref_metric.mean()
-										unit = ref_metric.unit
 									%>
-									<td>${"{:.2f} {}".format(target_value, unit)}</td>
+									<td>${str(ref_metric)}</td>
 									% else:
 									<td>N/A</td>
 									% endif
@@ -852,12 +849,12 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 									% if test in db["commits"][commit]['reports'][report.name]:
 									% if metric in db["commits"][commit]['reports'][report.name][test].results(BenchSubTestType.METRIC):
 									<%
-										value, unit = db["commits"][commit]['reports'][report.name][test].metrics[metric]
+										metric = db["commits"][commit]['reports'][report.name][test].metrics[metric]
 									%>
-										<td>${"{:.2f} {}".format(value, unit)}\\
-										% if target_value is not None:
+										<td>${str(metric)}\\
+										% if ref_metric is not None:
 <%
-											diff = compute_perf_difference(unit, target_value, value)
+											diff = compute_perf_difference(unit, ref_metric.mean(), metric.mean())
 										%>${" ({:.2f}%)".format(diff)}\\
 										% endif
 </td>
