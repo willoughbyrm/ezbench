@@ -1,4 +1,5 @@
 test_exec_time=10
+test_unit=OPS/s
 
 which x11perf >/dev/null 2>&1 || return 1
 

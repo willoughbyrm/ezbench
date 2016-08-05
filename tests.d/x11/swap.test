@@ -31,3 +31,4 @@ for m in $methods; do
     done
 done
 test_exec_time=10
+test_unit=OPS/s
