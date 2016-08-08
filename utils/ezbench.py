@@ -1099,7 +1099,7 @@ class SmartEzbench:
                 event_prio = 0.5
                 test_name_to_run = "no-op"
                 runs = 1
-            elif type(e) is EventPerfChange:
+            elif type(e) is EventPerfChange or type(e) is EventRenderingChange:
                 if e.commit_range.is_single_commit():
                     continue
 
