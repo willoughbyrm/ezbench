@@ -8,6 +8,7 @@ __gputest__() {
 
     rm _geeks3d_gputest_log.txt
     MESA_GL_VERSION_OVERRIDE=4.0 MESA_GLSL_VERSION_OVERRIDE=400 \
+    ENV_DUMP_RESTRICT_TO_BINARY="$(realpath $GPUTEST_FOLDER/GpuTest)" \
     run_bench 0 ./GpuTest /test=$1 $benchmark $2 > /dev/null || return 1
     frames_rendered=$(cat _geeks3d_gputest_log.txt | grep "# frames rendered" | cut -d '#' -f 2 | cut -d ':' -f2)
 

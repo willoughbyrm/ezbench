@@ -17,10 +17,10 @@ function __gl27__ {
 
     if [ $4 -eq 0 ]
     then
-        ENV_DUMP_RESTRICT_TO_BINARY=${GLB27} \
+        ENV_DUMP_RESTRICT_TO_BINARY="$(realpath "$GLB27")" \
         run_bench 130 $cmdline | sed '/fps/!d; s#.*: \(.*\) msec.*#1000000 / \1#' | bc -l
     else
-        frames_count=$(ENV_DUMP_RESTRICT_TO_BINARY=${GLB27} \
+        frames_count=$(ENV_DUMP_RESTRICT_TO_BINARY="$(realpath "$GLB27")" \
                        run_bench 0 $cmdline | sed '/fps/!d; s#.*: \(.*\) frames.*#\1#')
         echo "$frames_count / $4" | bc -l
     fi
@@ -68,7 +68,7 @@ function __gl27_FillTest__ {
     cmdline="unbuffer ${GLB27} -data ${GLB27_DATA} -skip_load_frames \
         -w $2 -h $3 -ow $2 -oh $3 -t $1"
 
-    ENV_DUMP_RESTRICT_TO_BINARY=${GLB27} \
+    ENV_DUMP_RESTRICT_TO_BINARY="$(realpath "$GLB27")" \
     run_bench 0 $cmdline | sed '/FPS/!d; s#.*: .* \(.*\) FPS)#\1#'
 }
 

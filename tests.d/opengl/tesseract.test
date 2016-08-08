@@ -18,7 +18,7 @@ __tesseract__() {
         mapstart = ""; demoend = ""; quit]; demo '$benchmark
 
     # Output: FPS: <fps>
-    ENV_DUMP_RESTRICT_TO_BINARY="$TESSERACT_FOLDER/bin_unix/linux_64_client" \
+    ENV_DUMP_RESTRICT_TO_BINARY="$(realpath "$TESSERACT_FOLDER/bin_unix/linux_64_client")" \
     HOME=/no_home \
     run_bench 0 ./tesseract_unix -x\'$script\' -w$width -h$height \
     -f$fullscreen | grep 'FPS: ' | cut -d ' ' -f 2
