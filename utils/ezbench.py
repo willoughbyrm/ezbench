@@ -2060,7 +2060,7 @@ class EventUnitResultUnstable:
 class Report:
     def __init__(self, log_folder, silentMode = False, restrict_to_commits = []):
         self.log_folder = log_folder
-        self.name = log_folder.split(os.sep)[-1]
+        self.name = os.path.basename(os.path.abspath(log_folder))
 
         self.tests = list()
         self.commits = list()

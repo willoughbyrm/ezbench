@@ -1043,7 +1043,8 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 				print("Output HTML generated at: {}".format(output))
 
 def gen_report(log_folder, restrict_commits):
-	report_name = [x for x in log_folder.split(os.sep) if x][-1]
+	report_name = os.path.basename(os.path.abspath(log_folder))
+
 	try:
 		sbench = SmartEzbench(ezbench_dir, report_name, readonly=True)
 		report = sbench.report(restrict_to_commits = restrict_commits)
