@@ -1575,8 +1575,9 @@ class TestRun:
 
 
 class SubTestResult:
-    def __init__(self, commit, test, key, runs):
-        self.commit = commit
+    def __init__(self, testResult, test, key, runs):
+        self.test_result = testResult
+        self.commit = testResult.commit
         self.test = test
         self.key = key
         self.runs = runs
@@ -1764,7 +1765,7 @@ class TestResult:
         if key not in self._cache_result:
             if len(self.runs) == 0:
                 raise ValueError('Cannot get the results when there are no runs ({})'.format(self.test_file))
-            self._cache_result[key] = SubTestResult(self.commit, self.test, key, self.runs)
+            self._cache_result[key] = SubTestResult(self, self.test, key, self.runs)
         return self._cache_result[key]
 
     def results(self, restrict_to_type = None):
@@ -1788,7 +1789,8 @@ class TestResult:
 
 
 class Commit:
-    def __init__(self, sha1, full_name, label):
+    def __init__(self, report, sha1, full_name, label):
+        self.report = report
         self.sha1 = sha1
         self.full_name = full_name
         self.label = label
@@ -2157,7 +2159,7 @@ class Report:
             if (len(restrict_to_commits) > 0 and sha1 not in restrict_to_commits
                 and label not in restrict_to_commits):
                 continue
-            commit = Commit(sha1, full_name, label)
+            commit = Commit(self, sha1, full_name, label)
 
             # Add the commit to the list of commits
             commit.results = sorted(commit.results, key=lambda res: res.test.full_name)
