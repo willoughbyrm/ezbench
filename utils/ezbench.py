@@ -1171,10 +1171,10 @@ class SmartEzbench:
         tasks_sorted = sorted(tasks, key=lambda t: t[0])
         scheduled_commits = added = 0
         self.__reload_state(keep_lock=True)
+        added = 0
         while len(tasks_sorted) > 0 and scheduled_commits < commit_schedule_max:
             commit = tasks_sorted[-1][1]
             self.__log(Criticality.DD, "Add all the tasks using commit {}".format(commit))
-            added = 0
             for t in tasks_sorted:
                 if t[1] == commit:
                     added += self.__force_test_rounds_unlocked__(t[1], t[2], t[3])
