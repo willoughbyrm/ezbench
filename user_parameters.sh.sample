@@ -53,6 +53,11 @@ DEPLOY_BASE_DIR=$ezBenchDir/builds
 LIBFRAMETIME64_SO=/usr/lib/libframetime.so
 LIBFRAMETIME32_SO=/usr/lib32/libframetime.so
 
+# apitrace parameters
+APITRACE_BINARY=/usr/bin/apitrace
+GLRETRACE_BINARY=/usr/bin/glretrace
+APITRACE_TRACE_FOLDER=/opt/benchmarks/apitraces
+
 # Benchmark parameters
 SYNMARK_FOLDER=/opt/benchmarks/SynMark2
 

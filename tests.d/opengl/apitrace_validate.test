@@ -1,0 +1,45 @@
+test -e "${APITRACE_BINARY}" || return 1
+test -e "${GLRETRACE_BINARY}" || return 1
+
+# 1 argument: $trace
+function __apitrace_validate_run__ {
+    local trace=$1
+    output=${run_log_file}_tmp
+
+    mkdir -p "$output"
+
+    ENV_DUMP_RESTRICT_TO_BINARY="${GLRETRACE_BINARY}" \
+    run_bench 0 "${APITRACE_BINARY}" dump-images \
+    --calls $(cat "$trace.calls.txt") \
+    -o "$output/frame" "$trace" > /dev/null 2>&1
+
+    for result in "$output/frame"*; do
+        test -f "$result" || continue
+
+        # Do not store the file as ${run_log_file}.${frameid} because we may
+        # get a lot of duplication. Instead, store it under its own SHA to
+        # get free de-duplication
+        filename=$(sha1sum "$result" | cut -d" " -f1)."${result##*.}"
+        frame=$(dirname "$run_log_file")/"$filename"
+        frameid=$(echo "$result" | sed "s/.*frame0*//g" | sed "s/\..*//g")
+
+        cp "$result" "$frame"
+        echo "$frameid","$filename"
+    done
+
+    rm "$output/"*
+    rmdir "$output"
+}
+
+for trace in "${APITRACE_TRACE_FOLDER}/validate:"*.trace; do
+    test -f "$trace" || continue
+
+    name="apitrace:$(basename ${trace%.*})"
+    eval "${name}_run() { __apitrace_validate_run__ ${trace}; }"
+    test_name="$test_name ${name}"
+done
+
+test_exec_time=10
+test_invert=1
+test_unit="imgs"
+test_type="imgval"
