@@ -2124,6 +2124,21 @@ class EventUnitResultUnstable:
         return msg.format(self.result.commit.sha1, self.result.subtest_fullname(),
                           self.result.to_set())
 
+class EventRenderingChange:
+    def __init__(self, test, commit_range, frameid, difference, confidence):
+        self.test = test
+        self.commit_range = commit_range
+        self.frameid = frameid
+        self.difference = difference
+        self.confidence = confidence
+
+    def diff(self):
+        return self.difference
+
+    def __str__(self):
+        msg = "{} changed the rendering of {}'s frame ID {} by {:.5f} RMSE with confidence p={:.2f}"
+        return msg.format(self.commit_range, self.test.full_name, self.frameid, self.diff(), self.confidence)
+
 class Report:
     def __init__(self, log_folder, silentMode = False, restrict_to_commits = []):
         self.log_folder = log_folder
@@ -2392,6 +2407,25 @@ class Report:
                         # Nothing to do for now, until we start bisecting
                         # power.
                         pass
+                    elif result.value_type == BenchSubTestType.SUBTEST_IMAGE:
+                        subtest_name = result.subtest_fullname()
+
+                        if len(commits_rev_order) == 0:
+                            continue
+
+                        if subtest_name in test_prev:
+                            old_perf = test_prev[subtest_name]
+                            diff, confidence = result.compare(old_perf)
+
+                            # TODO: Read minimum difference from configuration file
+                            if confidence >= perf_diff_confidence and diff >= 1.0e-4:
+                                commit_range = EventCommitRange(test_prev[subtest_name].commit, commit)
+                                self.events.append(EventRenderingChange(result.test,
+                                                                commit_range,
+                                                                result.key,
+                                                                diff,
+                                                                confidence))
+                        test_prev[subtest_name] = result
                     else:
                         print("WARNING: enhance_report: unknown result type {}".format(result.value_type))
 
