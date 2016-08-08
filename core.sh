@@ -688,6 +688,8 @@ do
                     run_avg=$(awk '{sum=sum+$1} END {print sum/NR}' $run_log_file)
                 elif [ ${testType[$t]} == "unit" ]; then
                     run_avg=$(head -n 1 $run_log_file)
+                elif [ ${testType[$t]} == "imgval" ]; then
+                    run_avg=0.0
                 fi
                 echo "$run_avg" >> "$fps_logs"
             else
