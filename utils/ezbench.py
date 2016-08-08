@@ -48,6 +48,8 @@ import sys
 import os
 import re
 
+import imgcmp
+
 # Import ezbench from the timings/ folder
 timing_dir = os.path.abspath(sys.path[0]+"/../timing_DB/")
 if not os.path.isdir(timing_dir):
@@ -1406,6 +1408,20 @@ class Metric(SubTestFloat):
         else:
             return 0
 
+class SubTestImage(SubTestBase):
+    def __init__(self, name, imgFileName, data_raw_file = None):
+        super().__init__(name, BenchSubTestType.SUBTEST_IMAGE, None, None, data_raw_file)
+        self.img_file_name = imgFileName
+
+    def image_file(self):
+        return self.value
+
+    def set_reference(self, imgFile):
+        self.value = self.img_compare(imgFile)
+
+    def img_compare(self, imgFile):
+        return imgcmp.compare(self.img_file_name, imgFile, ['RMSE'], 'null:')
+
 class TestRun:
     def __init__(self, testResult, testType, runFile, metricsFiles, mainValueType = None, mainValue = None):
         self.test_result = testResult
@@ -1431,11 +1447,24 @@ class TestRun:
             for subtest in unit_tests:
                 result = SubTestString(subtest, unit_tests[subtest], runFile)
                 self.__add_result__(result)
+        elif testType == "imgval":
+            self.importImgTestRun(runFile)
         else:
             raise ValueError("Ignoring results because the type '{}' is unknown".format(testType))
 
         for f in metricsFiles:
             self.__add_metrics__(f)
+
+    def importImgTestRun(self, runFile):
+        with open(runFile, 'rt') as f:
+            for line in f:
+                split = line.split(',')
+                if len(split) == 2:
+                    frameid = split[0].strip()
+                    frame_file = split[1].strip()
+                    fullpath = os.path.join(self.test_result.commit.report.log_folder, frame_file)
+                    self.__add_result__(SubTestImage(frameid, fullpath, runFile))
+            self.__add_result__(SubTestString("", "complete", runFile))
 
     def __add_result__(self, subtest):
         if subtest.subtest_type == BenchSubTestType.METRIC:
@@ -1613,6 +1642,23 @@ class SubTestResult:
                 continue
             self.results.append((run, run_result.value))
 
+        if self.value_type == BenchSubTestType.SUBTEST_IMAGE:
+            log_folder = self.commit.report.log_folder
+
+            # Generate average
+            images = []
+            for run in runs:
+                images.append(run.result(self.key).img_file_name)
+
+            # Generate the average image with the list of image files
+            self.average_image_file = os.path.join(log_folder, '{}.{}.avg.png'.format(testResult.test_file, self.key))
+            imgcmp.average(images, self.average_image_file)
+
+            # Compare every image to the average image
+            for run in runs:
+                run.result(self.key).set_reference(self.average_image_file)
+                self.results.append((run, run.result(self.key).value))
+
         self._cache_list = None
         self._cache_list_stats = None
 
@@ -1646,6 +1692,7 @@ class SubTestResult:
 
         if self._cache_list_stats is None:
             if (self.value_type == BenchSubTestType.SUBTEST_FLOAT or
+                self.value_type == BenchSubTestType.SUBTEST_IMAGE or
                 self.value_type == BenchSubTestType.METRIC):
                 self._cache_list_stats = ListStats(self.to_list())
             else:
@@ -1661,13 +1708,23 @@ class SubTestResult:
             equal_var: f True (default), perform a standard independent 2 sample test that assumes equal population variances [R263]. If False, perform Welch’s t-test, which does not assume equal population variance [R264].
 
         Returns:
-            the difference of the means (self - b)
+            the difference going from the old to the new result
             the confidence of them being from the same normal distribution
 
         WARNING: Does not work when the type is SUBTEST_STRING
         """
+        if self.value_type == BenchSubTestType.SUBTEST_IMAGE:
+            results = []
+            for run in self.runs:
+                results.append(run.result(self.key).img_compare(old_subtestresult.average_image_file))
 
-        return self.to_liststat().compare(old_subtestresult.to_liststat())
+            # Do the reverse comparaison because the distance has no direction
+            # and the oldresult's average value should be 0 anyway
+            new_results = ListStats(results)
+            diff, confidence = old_subtestresult.to_liststat().compare(new_results)
+            return new_results.mean(), confidence
+        else:
+            return self.to_liststat().compare(old_subtestresult.to_liststat())
 
     def mean(self):
         """
@@ -2134,7 +2191,7 @@ class Report:
         # Find all the result files and sort them by sha1
         files_list = os.listdir()
         testFiles = dict()
-        commit_test_file_re = re.compile(r'^(.+)_(bench|unit)_[^\.]+(.metrics_[^\.]+)?$')
+        commit_test_file_re = re.compile(r'^(.+)_(bench|unit|imgval)_[^\.]+(.metrics_[^\.]+)?$')
         for f in files_list:
             if os.path.isdir(f):
                 continue
