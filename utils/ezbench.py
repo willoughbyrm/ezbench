@@ -1227,7 +1227,7 @@ class Test:
 
 class ListStats:
     def __init__(self, data):
-        self.data = data
+        self.data = array(data)
 
         # cached data
         self._cache_result = None
@@ -1292,7 +1292,7 @@ class ListStats:
             the number of samples needed to reach the wanted confidence
         """
 
-        data = array(self.data)
+        data = self.data
         if len(data) < 2 or data.var() == 0:
             return 0, 2
 
@@ -1336,10 +1336,18 @@ class ListStats:
             the confidence of them being from the same normal distribution
         """
 
-        t, p = stats.ttest_ind(distrib_b.data, self.data,
-                               equal_var = equal_var)
-        if distrib_b.mean() > 0:
+        if self.data.var() == 0 and distrib_b.data.var() == 0:
+            if self.data[0] == distrib_b.data[0]:
+                p = 1
+            else:
+                p = 0
+        else:
+            t, p = stats.ttest_ind(distrib_b.data, self.data,
+                    equal_var = equal_var)
+        if distrib_b.mean() != 0:
             diff = abs(self.mean() - distrib_b.mean()) / distrib_b.mean()
+        elif self.mean() == distrib_b.mean():
+            diff = 0
         else:
             diff = float('inf')
 
