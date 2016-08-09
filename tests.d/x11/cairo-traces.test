@@ -7,6 +7,7 @@ hash cairo-perf-trace 2> /dev/null || return 1
 
 function __cairo_traces__ {
     ns=$(CAIRO_TRACE_DIR="$CAIRO_TRACES" CAIRO_TEST_TARGET=$1 \
+    ENV_DUMP_RESTRICT_TO_BINARY="$(which cairo-perf-trace | sed -e 's|cairo-perf-trace$|.libs/lt-cairo-perf-trace|g')" \
     run_bench 0 cairo-perf-trace $2 -ri 1 | \
     grep -e "\[*\] $1.rgba $2.0 " | cut -d ' ' -f 5)
     bc <<< "scale=2; $ns/1000000.0"
