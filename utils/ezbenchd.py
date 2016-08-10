@@ -265,7 +265,11 @@ def setup_http_server(bind_ip = "0.0.0.0", port = 8080):
     class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
         pass
 
-    server = ThreadedTCPServer((bind_ip, port), CustomHTTPHandler)
+
+    server = ThreadedTCPServer((bind_ip, port), CustomHTTPHandler, bind_and_activate=False)
+    server.allow_reuse_address = True
+    server.server_bind()
+    server.server_activate()
     server_thread = threading.Thread(target=server.serve_forever)
     server_thread.daemon = True
     server_thread.start()
