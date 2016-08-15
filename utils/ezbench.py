@@ -2417,12 +2417,18 @@ class Report:
 
                             # TODO: Read minimum difference from configuration file
                             if confidence >= perf_diff_confidence and diff >= 1.0e-4:
-                                commit_range = EventCommitRange(test_prev[subtest_name].commit, commit)
-                                self.events.append(EventRenderingChange(result.test,
-                                                                commit_range,
-                                                                result.key,
-                                                                diff,
-                                                                confidence))
+                                if len(old_perf) < 2:
+                                    self.events.append(EventResultNeedsMoreRuns(old_perf, 2))
+                                if len(result) < 2:
+                                    self.events.append(EventResultNeedsMoreRuns(result, 2))
+                                if len(old_perf) >= 2 and len(result) >= 2:
+                                    commit_range = EventCommitRange(test_prev[subtest_name].commit, commit)
+                                    self.events.append(EventRenderingChange(result.test,
+                                                                            commit_range,
+                                                                            result.key,
+                                                                            old_perf,
+                                                                            result, diff,
+                                                                            confidence))
                         test_prev[subtest_name] = result
                     else:
                         print("WARNING: enhance_report: unknown result type {}".format(result.value_type))
