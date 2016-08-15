@@ -1232,10 +1232,7 @@ class ListStats:
         self.data = array(data)
 
         # cached data
-        self._cache_result = None
-        self._cache_mean = None
-        self._cache_std = None
-        self._cache_mean_simple = None
+        self.invalidate_cache()
 
     def invalidate_cache(self):
         """ Trash the cache, necessary if you manually update the data (BAD!) """
@@ -1243,6 +1240,7 @@ class ListStats:
         self._cache_result = None
         self._cache_mean = None
         self._cache_std = None
+        self._cache_mean_simple = None
 
     def __samples_needed__(self, sigma, margin, confidence=0.95):
         # TODO: Find the function in scipy to get these values
