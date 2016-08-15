@@ -10,7 +10,7 @@ function __apitrace_validate_run__ {
 
     ENV_DUMP_RESTRICT_TO_BINARY="${GLRETRACE_BINARY}" \
     run_bench 0 "${APITRACE_BINARY}" dump-images \
-    --calls $(cat "$trace.calls.txt") \
+    --calls "$(cat "$trace.calls.txt")" \
     -o "$output/frame" "$trace" > /dev/null 2>&1
 
     for result in "$output/frame"*; do
