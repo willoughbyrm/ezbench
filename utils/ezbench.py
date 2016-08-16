@@ -1994,7 +1994,6 @@ class EventCommitRange:
             return "commit before {}".format(self.new.sha1)
 
 
-        float("inf")
 
 class EventBuildBroken:
     def __init__(self, commit_range):
@@ -2426,8 +2425,7 @@ class Report:
                                     self.events.append(EventRenderingChange(result.test,
                                                                             commit_range,
                                                                             result.key,
-                                                                            old_perf,
-                                                                            result, diff,
+                                                                            diff,
                                                                             confidence))
                         test_prev[subtest_name] = result
                     else:
