@@ -1983,7 +1983,9 @@ class EventCommitRange:
         return self.distance() <= 1
 
     def distance(self):
-        if self.old is not None:
+        if self.old == self.new:
+            return 0
+        elif self.old is not None:
             if hasattr(self.old, "git_distance_head") and hasattr(self.new, "git_distance_head"):
                 return self.old.git_distance_head - self.new.git_distance_head
             else:
