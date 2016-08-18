@@ -1196,7 +1196,6 @@ class SmartEzbench:
 class Test:
     def __init__(self, full_name, unit="undefined"):
         self.full_name = full_name
-        self.prevValue = -1
         self.unit_str = unit
 
     # returns (base_name, subtests=[])
