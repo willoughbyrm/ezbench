@@ -2421,10 +2421,20 @@ class Report:
             for testresult in commit.results:
                 for result_key in testresult.results():
                     result = testresult.result(result_key)
-                    test = result.test.full_name
+                    test = result.subtest_fullname()
                     test_unit = result.test.unit_str
 
-                    if result.value_type == BenchSubTestType.SUBTEST_FLOAT:
+                    if (result.value_type == BenchSubTestType.SUBTEST_FLOAT or
+                        result.value_type == BenchSubTestType.METRIC):
+
+                        # Do not care about any metric that is not Joules or Watts
+                        # as they may not have the property of being instantaneous
+                        # and would be un-reproducable
+                        if (result.value_type == BenchSubTestType.METRIC and
+                            result.unit != "W" and result.unit != "J" and
+                            result.unit != "FPS/W"):
+                            continue
+
                         if result.margin() > max_variance:
                             self.events.append(EventInsufficientSignificance(result, max_variance))
 
