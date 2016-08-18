@@ -1991,6 +1991,18 @@ class EventCommitRange:
         else:
             return sys.maxsize
 
+    def __eq__(x, y):
+        if x.is_single_commit() and y.is_single_commit():
+            return x.new == y.new
+        else:
+            return x.old == y.old and x.new == y.new
+
+    def __hash__(self):
+        if self.is_single_commit():
+            return hash(self.new)
+        else:
+            return hash(self.old) ^ hash(self.new)
+
     def __str__(self):
         if self.new == None:
             return "commit {}".format(self.old.sha1)
