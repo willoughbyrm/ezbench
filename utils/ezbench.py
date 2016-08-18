@@ -2017,10 +2017,10 @@ class EventCommitRange:
 
     def __str__(self):
         if self.new == None:
-            return "commit {}".format(self.old.sha1)
+            return "{}".format(self.old.full_name)
 
         if self.is_single_commit():
-            return "commit {}".format(self.new.sha1)
+            return "{}".format(self.new.full_name)
         elif self.old is not None:
             distance = self.distance()
             if distance == -1:
