@@ -1198,6 +1198,12 @@ class Test:
         self.full_name = full_name
         self.unit_str = unit
 
+    def __eq__(x, y):
+        return x.full_name == y.full_name and x.unit_str == y.unit_str
+
+    def __hash__(self):
+        return hash(self.full_name) ^ hash(self.unit_str)
+
     # returns (base_name, subtests=[])
     @classmethod
     def parse_name(cls, full_name):
