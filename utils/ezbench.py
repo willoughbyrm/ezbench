@@ -2030,19 +2030,53 @@ class EventCommitRange:
         else:
             return "commit before {}".format(self.new.full_name)
 
-
-
-class EventBuildBroken:
-    def __init__(self, commit_range):
+class Event:
+    def __init__(self, event_type, commit_range, test, subresult_key, significance, short_desc):
+        self.event_type = event_type
         self.commit_range = commit_range
+        self.test = test
+        self.subresult_key = subresult_key
+        self.significance = significance
+        self.short_desc = short_desc
+
+    def __str__(self):
+        if self.test is not None:
+            return "{}: {}: {}".format(self.commit_range, self.test.full_name, self.short_desc)
+        else:
+            return "{}: {}".format(self.commit_range, self.short_desc)
+
+class EventBuildBroken(Event):
+    def __init__(self, commit_range):
+        super().__init__("build", commit_range, None, None, 1, "build broke")
 
     def __str__(self):
         return "{} broke the build".format(self.commit_range)
 
-class EventBuildFixed:
+class EventBuildFixed(Event):
     def __init__(self, broken_commit_range, fixed_commit_range):
         self.broken_commit_range = broken_commit_range
         self.fixed_commit_range = fixed_commit_range
+
+        parenthesis = ""
+        if (not self.broken_commit_range.is_single_commit() or
+            not self.fixed_commit_range.is_single_commit()):
+            parenthesis = "at least "
+        parenthesis += "after "
+
+        # Generate the description
+        time = self.broken_for_time()
+        if time is not None and time != "":
+            parenthesis += time + " and "
+        commits = self.broken_for_commit_count()
+        if commits == -1:
+            commits = "unknown"
+        parenthesis += "{} commits".format(commits)
+
+        main = "Fix build regression introduced by {} fixed"
+        main = main.format(self.broken_commit_range)
+        desc = "{} ({})".format(main, parenthesis)
+
+        super().__init__("build", fixed_commit_range, None, None, 1, desc)
 
     def broken_for_time(self):
         if (self.broken_commit_range.new.commit_date > datetime.min and
@@ -2067,32 +2101,27 @@ class EventBuildFixed:
         else:
             return -1
 
-    def __str__(self):
-        parenthesis = ""
-        if (not self.broken_commit_range.is_single_commit() or
-            not self.fixed_commit_range.is_single_commit()):
-            parenthesis = "at least "
-        parenthesis += "after "
-
-        time = self.broken_for_time()
-        if time is not None and time != "":
-            parenthesis += time + " and "
-        commits = self.broken_for_commit_count()
-        if commits == -1:
-            commits = "unknown"
-        parenthesis += "{} commits".format(commits)
-
-        main = "{} fixed the build regression introduced by {}"
-        main = main.format(self.fixed_commit_range, self.broken_commit_range)
-        return "{} ({})".format(main, parenthesis)
-
-class EventPerfChange:
-    def __init__(self, test, commit_range, old_result, new_result, confidence):
-        self.test = test
-        self.commit_range = commit_range
+class EventPerfChange(Event):
+    def __init__(self, commit_range, old_result, new_result, confidence):
         self.new_result = new_result
         self.old_result = old_result
         self.confidence = confidence
+
+        if old_result.key != new_result.key:
+            raise ValueError("Results should have the same key (old={}, new={})".format(old_result.key, new_result.key))
+
+        if old_result.unit != new_result.unit:
+            raise ValueError("Results should have the same unit (old={}, new={})".format(old_result.unit, new_result.unit))
+
+        key = self.old_result.key
+        if len(key) == 0:
+            key = "main value"
+
+        msg = "{} went from {:.2f} to {:.2f} {} ({:+.2f}%) with confidence p={:.2f}"
+        desc = msg.format(key, self.old_result.mean(), self.new_result.mean(),
+                          self.new_result.unit,self.diff() * 100, self.confidence)
+
+        super().__init__("perf", commit_range, old_result.test, old_result.key, abs(self.diff()), desc)
 
     def diff(self):
         if self.old_result.mean() != 0:
@@ -2103,75 +2132,82 @@ class EventPerfChange:
             return float("inf")
 
     def __str__(self):
-        msg = "{} changed the performance of {} from {:.2f} to {:.2f} {} ({:+.2f}%) with confidence p={:.2f}"
-        return msg.format(self.commit_range, self.test.full_name,
-                          self.old_result.mean(), self.new_result.mean(),
-                          self.new_result.unit, self.diff() * 100,
-                          self.confidence)
+        msg = "{} changed the performance of {}: {}"
+        return msg.format(self.commit_range, self.old_result.test.full_name, self.short_desc)
 
-class EventResultNeedsMoreRuns:
+class EventResultNeedsMoreRuns(Event):
     def __init__(self, result, wanted_n):
         self.result = result
         self._wanted_n = wanted_n
 
+        key = self.result.key
+        if len(key) == 0:
+            key = "main value"
+
+        msg = "{} requires at least {} runs, found {}"
+        desc = msg.format(key, self.wanted_n(), len(self.result))
+
+        super().__init__("variance", EventCommitRange(result.commit), result.test, result.key, wanted_n, desc)
+
     def wanted_n(self):
         return self._wanted_n
-
-    def __str__(self):
-        msg = "Result {} on commit {} requires at least {} runs."
-        return msg.format(self.result.subtest_fullname(), self.result.commit.sha1,
-                          self.wanted_n())
 
 class EventInsufficientSignificance(EventResultNeedsMoreRuns):
     def __init__(self, result, wanted_margin):
         super().__init__(result, result.confidence_margin(wanted_margin)[1])
         self.wanted_margin = wanted_margin
 
+        key = self.result.key
+        if len(key) == 0:
+            key = "main value"
+
+        msg = "{} requires more runs to reach the wanted margin ({:.2f}% vs {:.2f}%), proposes n = {}, found {}."
+        self.short_desc.format(key, self.margin() * 100, self.wanted_margin * 100,
+                               self.wanted_n(), len(self.result))
+
     def margin(self):
         return self.result.confidence_margin(self.wanted_margin)[0]
 
-    def __str__(self):
-        msg = "Test {} on commit {} requires more runs to reach the wanted margin ({:.2f}% vs {:.2f}%), proposes n = {}."
-        return msg.format(self.result.test.full_name, self.result.commit.sha1,
-                          self.margin() * 100, self.wanted_margin * 100, self.wanted_n())
-
-class EventUnitResultChange:
-    def __init__(self, subtest_name, commit_range, old_result, new_result):
-        self.subtest_name = subtest_name
-        self.commit_range = commit_range
+class EventUnitResultChange(Event):
+    def __init__(self, commit_range, old_result, new_result):
         self.old_result = old_result
         self.new_result = new_result
-        self.old_status = old_result[0]
-        self.new_status = new_result[0]
+        self.old_status = old_result
+        self.new_status = new_result
 
-    def __str__(self):
-        msg = "{} changed the status of {} from {} to {}"
-        return msg.format(self.commit_range, self.subtest_name,
-                          self.old_status, self.new_status)
+        if old_result.key != new_result.key:
+            raise ValueError("Results should have the same key (old={}, new={})".format(old_result.key, new_result.key))
 
-class EventUnitResultUnstable:
+        if old_result.unit != new_result.unit:
+            raise ValueError("Results should have the same unit (old={}, new={})".format(old_result.unit, new_result.unit))
+
+        msg = "{}: {} -> {}"
+        desc = msg.format(self.old_result.key, self.old_status, self.new_status)
+
+        super().__init__("unit test",commit_range, old_result.test, old_result.key, 2, desc)
+
+class EventUnitResultUnstable(Event):
     def __init__(self, result):
         self.result = result
 
-    def __str__(self):
-        msg = "Unstable result on version {} for {} (got {})"
-        return msg.format(self.result.commit.sha1, self.result.subtest_fullname(),
-                          self.result.to_set())
+        msg = "{}: unstable results ({})"
+        desc = msg.format(self.result.key, self.result.to_set())
 
-class EventRenderingChange:
-    def __init__(self, test, commit_range, frameid, difference, confidence):
-        self.test = test
-        self.commit_range = commit_range
-        self.frameid = frameid
+        super().__init__("unit test", EventCommitRange(result.commit), result.test, result.key, 2, desc)
+
+class EventRenderingChange(Event):
+    def __init__(self, commit_range, result, difference, confidence):
+        self.result = result
         self.difference = difference
         self.confidence = confidence
 
+        msg = "frame ID {} changed by {:.5f} RMSE with confidence p={:.2f}"
+        desc = msg.format(self.result.key, self.diff(), self.confidence)
+
+        super().__init__("rendering", commit_range, result.test, result.key, abs(self.diff()), desc)
+
     def diff(self):
         return self.difference
-
-    def __str__(self):
-        msg = "{} changed the rendering of {}'s frame ID {} by {:.5f} RMSE with confidence p={:.2f}"
-        return msg.format(self.commit_range, self.test.full_name, self.frameid, self.diff(), self.confidence)
 
 class Report:
     def __init__(self, log_folder, silentMode = False, restrict_to_commits = []):
@@ -2397,8 +2433,7 @@ class Report:
                             # same normal distribution, say that the performance changed
                             if confidence >= perf_diff_confidence and diff >= smallest_perf_change:
                                 commit_range = EventCommitRange(test_prev[test].commit, commit)
-                                self.events.append(EventPerfChange(result.test,
-                                                                commit_range,
+                                self.events.append(EventPerfChange(commit_range,
                                                                 old_perf, result,
                                                                 confidence))
                         test_prev[test] = result
@@ -2430,10 +2465,9 @@ class Report:
                                     self.events.append(EventResultNeedsMoreRuns(result, 2))
                                 if len(before) >= 2 and len(result) >= 2:
                                     commit_range = EventCommitRange(unittest_prev[subtest_name].commit, commit)
-                                    self.events.append(EventUnitResultChange(subtest_name,
-                                                                                commit_range,
-                                                                                before,
-                                                                                result))
+                                    self.events.append(EventUnitResultChange(commit_range,
+                                                                             before,
+                                                                             result))
 
                         unittest_prev[subtest_name] = result
 
@@ -2459,10 +2493,8 @@ class Report:
                                     self.events.append(EventResultNeedsMoreRuns(result, 2))
                                 if len(old_perf) >= 2 and len(result) >= 2:
                                     commit_range = EventCommitRange(test_prev[subtest_name].commit, commit)
-                                    self.events.append(EventRenderingChange(result.test,
-                                                                            commit_range,
-                                                                            result.key,
-                                                                            diff,
+                                    self.events.append(EventRenderingChange(commit_range,
+                                                                            result, diff,
                                                                             confidence))
                         test_prev[subtest_name] = result
                     else:
