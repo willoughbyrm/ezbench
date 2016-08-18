@@ -2028,7 +2028,7 @@ class EventCommitRange:
             return "commit range {}:{}({})".format(self.old.sha1, self.new.sha1,
                                                    distance)
         else:
-            return "commit before {}".format(self.new.sha1)
+            return "commit before {}".format(self.new.full_name)
 
 
 
