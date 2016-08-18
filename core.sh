@@ -107,8 +107,14 @@ function run_bench {
 
     callIfDefined run_bench_pre_hook
     local time_before=$(date +%s.%N)
+
     eval $cmd > "$run_log_file_stdout" 2> "$run_log_file_stderr"
     local exit_code=$?
+
+    if [ -f "$env_dump_path" ]; then
+        $ezBenchDir/utils/env_dump/env_dump_extend.sh "$SHA1_DB" "$run_log_file.env_dump"
+    fi
+
     local time_after=$(date +%s.%N)
     local test_exec_time=$(echo "$time_after - $time_before" | bc -l)
     callIfDefined run_bench_post_hook
@@ -116,10 +122,6 @@ function run_bench {
     # If the test does not have subtests, then store the execution time
     if [ -z "$benchSubtests" ]; then
         "$ezBenchDir/timing_DB/timing.py" -n test -k "$benchName" -a $test_exec_time
-    fi
-
-    if [ -f "$env_dump_path" ]; then
-        $ezBenchDir/utils/env_dump/env_dump_extend.sh "$SHA1_DB" "$run_log_file.env_dump"
     fi
 
     # delete the log files if they are empty
