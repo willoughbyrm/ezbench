@@ -1860,6 +1860,14 @@ class Commit:
 
         self.__parse_commit_information__()
 
+    def __eq__(x, y):
+        if y is None:
+            return False
+        return x.sha1 == y.sha1
+
+    def __hash__(self):
+        return hash(self.sha1)
+
     def __parse_commit_information__(self):
         self.compile_log = self.sha1 + "_compile_log"
         self.patch = self.sha1 + ".patch"
