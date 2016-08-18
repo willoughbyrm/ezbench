@@ -850,12 +850,12 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 									% if test in db["commits"][commit]['reports'][report.name]:
 									% if metric in db["commits"][commit]['reports'][report.name][test].results(BenchSubTestType.METRIC):
 									<%
-										metric = db["commits"][commit]['reports'][report.name][test].metrics[metric]
+										m = db["commits"][commit]['reports'][report.name][test].metrics[metric]
 									%>
-										<td>${str(metric)}\\
+										<td>${str(m)}\\
 										% if ref_metric is not None:
 <%
-											diff = compute_perf_difference(unit, ref_metric.mean(), metric.mean())
+											diff = compute_perf_difference(unit, ref_metric.mean(), m.mean())
 										%>${" ({:.2f}%)".format(diff)}\\
 										% endif
 </td>
