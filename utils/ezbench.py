@@ -1676,7 +1676,11 @@ class SubTestResult:
                 self.value_type == BenchSubTestType.METRIC):
             return SubTestFloat.to_string(self.mean(), self.unit, self.margin(), len(self))
         else:
-            return str(self.to_set())
+            s = self.to_set()
+            if len(s) == 1:
+                return self.to_list()[0]
+            else:
+                return str(s)
 
     def to_list(self):
         """ Returns the list of all the mean values for every run """
