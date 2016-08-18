@@ -136,6 +136,8 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 
 			__env_add_result__(db, human_envs, reference_report, ref_commit, result)
 
+	db["events"] = Report.event_tree(reports)
+
 	for report in reports:
 		db["reports"].append(report)
 
@@ -146,7 +148,6 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 		for test in report.tests:
 			db["envs"][test.full_name] = dict()
 
-		db["events"][report.name] = list()
 		for event in report.events:
 			if type(event) is EventBuildBroken:
 				event.commit_range.new.annotation = event.commit_range.new.sha1 + ": build broken"
@@ -159,7 +160,6 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 					if result.test.full_name != event.test.full_name:
 						continue
 					result.annotation = str(event)
-			db["events"][report.name].append(event)
 
 		# add all the commits
 		for commit in report.commits:
@@ -266,7 +266,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 	<%! import cgi %>
 	<%! import html %>
 	<%! import ezbench %>
-	<%! from ezbench import compute_perf_difference, BenchSubTestType %>
+	<%! from ezbench import compute_perf_difference, BenchSubTestType, Event %>
 
 	<html xmlns="http://www.w3.org/1999/xhtml">
 		<head>
@@ -313,7 +313,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 					background: #dae5f4;
 				}
 
-				.env_node:hover {
+				.tree_node:hover {
 					cursor: pointer;
 					text-decoration: underline;
 				}
@@ -751,14 +751,68 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 			<center><div id="details_table" style="width: 100%; height: 500px;"></div></center>
 
 			<h2>Events</h2>
+			% for r in db["events"]:
+				<%
+					key = 0
+					week_prev = -1
+				%>
+				<h3>${r}</h3>
 
-			% for report in db['events']:
-				<h3>${report}</h3>
+				<div class="css-treeview">
 				<ul>
-				% for event in db['events'][report]:
-					<li>${event}</li>
+
+				% for c in db["events"][r]:
+					<%
+						key = key + 1
+						id = "events_" + str(key)
+
+						subentries = ""
+						for t in db["events"][r][c]:
+							if len(subentries) > 0:
+								subentries += ", "
+							subentries += "{} {}(s)".format(len(db["events"][r][c][t]), t)
+
+						label = "{} ({}) - {}".format(str(c), subentries, c.date())
+						label = html.escape(label)
+						type_checked = len(db["events"][r][c]) == 1
+
+						commit_date = c.old.commit_date
+						week = "{}-{}".format(commit_date.year, commit_date.isocalendar()[1])
+					%>
+					% if week != week_prev:
+					<%
+						week_prev = week
+					%>
+					<h4>Work week ${week}</h4>
+					% endif
+<li><input type="checkbox" id="${id}"/><label class="tree_node" for="${id}">+ ${label}</label><ul>
+						% for t in db["events"][r][c]:
+							<%
+								key = key + 1
+								id = "events_" + str(key)
+							%>\\
+<li><input type="checkbox" id="${id}" checked="${type_checked}"/><label class="tree_node" for="${id}">+ ${t} (${len(db["events"][r][c][t])} test(s))</label><ul>
+								% for test in db["events"][r][c][t]:
+								% if not isinstance(test, Event):
+									<%
+										key = key + 1
+										id = "events_" + str(key)
+									%>\\
+<li><input type="checkbox" id="${id}" checked="${type_checked}"/><label class="tree_node" for="${id}">+ ${test.full_name} (${len(db["events"][r][c][t][test])} result(s))</label><ul>
+										% for e in db["events"][r][c][t][test]:
+<li>${html.escape(e.short_desc)}</li>
+										% endfor
+									</ul></li>
+								% else:
+<li>${html.escape(test.short_desc)}</li>
+								% endif
+								% endfor
+							</ul></li>
+						% endfor
+					</ul></li>
 				% endfor
 				</ul>
+				</div>
 			% endfor
 
 			<h2>Tests</h2>
@@ -768,7 +822,7 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 
 					<div class="css-treeview">
 						<%def name="outputtreenode(node, id, label, attr = '')">
-							<li><input type="checkbox" id="${id}" ${attr}/><label class="env_node" for="${id}">+${label}</label><ul>
+							<li><input type="checkbox" id="${id}" ${attr}/><label class="tree_node" for="${id}">+${label}</label><ul>
 								<table>
 								% for child in sorted(node):
 									% if type(node[child]) is str:
