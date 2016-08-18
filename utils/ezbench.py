@@ -1196,13 +1196,13 @@ class SmartEzbench:
 class Test:
     def __init__(self, full_name, unit="undefined"):
         self.full_name = full_name
-        self.unit_str = unit
+        self.unit = unit
 
     def __eq__(x, y):
-        return x.full_name == y.full_name and x.unit_str == y.unit_str
+        return x.full_name == y.full_name and x.unit == y.unit
 
     def __hash__(self):
-        return hash(self.full_name) ^ hash(self.unit_str)
+        return hash(self.full_name) ^ hash(self.unit)
 
     # returns (base_name, subtests=[])
     @classmethod
@@ -1447,7 +1447,7 @@ class TestRun:
             # There are no subtests here
             data, unit, more_is_better = readCsv(runFile)
             if len(data) > 0:
-                result = SubTestFloat("", testResult.unit_str, data, runFile)
+                result = SubTestFloat("", testResult.unit, data, runFile)
                 self.__add_result__(result)
         elif testType == "unit":
             unit_tests = readUnitRun(runFile)
@@ -1792,7 +1792,7 @@ class TestResult:
         self.runs = []
         self.test_type = testType
         self.more_is_better = True
-        self.unit_str = None
+        self.unit = None
 
         self._results = set()
         self._cache_result = None
@@ -1801,26 +1801,26 @@ class TestResult:
 
     def __parse_results__(self, testType, testFile, runFiles, metricsFiles):
         # Read the data and abort if there is no data
-        data, unit_str, self.more_is_better = readCsv(testFile)
+        data, unit, self.more_is_better = readCsv(testFile)
         if len(data) == 0:
             raise ValueError("The TestResult {} does not contain any runs".format(testFile))
 
-        if unit_str is None:
-            unit_str = "FPS"
-        self.unit_str = unit_str
+        if unit is None:
+            unit = "FPS"
+        self.unit = unit
 
         # Check that we have the same unit as the test
-        if self.test.unit_str != self.unit_str:
-            if self.test.unit_str != "undefined":
+        if self.test.unit != self.unit:
+            if self.test.unit != "undefined":
                 msg = "The unit used by the test '{test}' changed from '{unit_old}' to '{unit_new}' in commit {commit}"
                 print(msg.format(test=test.full_name,
-                                unit_old=test.unit_str,
-                                unit_new=self.unit_str,
+                                unit_old=test.unit,
+                                unit_new=self.unit,
                                 commit=commit.sha1))
-            self.test.unit_str = unit_str
+            self.test.unit = unit
 
         for i in range(0, len(runFiles)):
-            run = TestRun(self, testType, runFiles[i], metricsFiles[runFiles[i]], unit_str, data[i])
+            run = TestRun(self, testType, runFiles[i], metricsFiles[runFiles[i]], unit, data[i])
             self._results |= run.results()
             self.runs.append(run)
 
@@ -2422,7 +2422,7 @@ class Report:
                 for result_key in testresult.results():
                     result = testresult.result(result_key)
                     test = result.subtest_fullname()
-                    test_unit = result.test.unit_str
+                    test_unit = result.test.unit
 
                     if (result.value_type == BenchSubTestType.SUBTEST_FLOAT or
                         result.value_type == BenchSubTestType.METRIC):
@@ -2488,11 +2488,6 @@ class Report:
                                                                              result))
 
                         unittest_prev[subtest_name] = result
-
-                    elif result.value_type == BenchSubTestType.METRIC:
-                        # Nothing to do for now, until we start bisecting
-                        # power.
-                        pass
                     elif result.value_type == BenchSubTestType.SUBTEST_IMAGE:
                         subtest_name = result.subtest_fullname()
 

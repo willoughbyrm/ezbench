@@ -125,7 +125,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 		db['reference'] = reference_report
 		for result in ref_commit.results:
 			average_raw = result.result().mean()
-			average = convert_unit(average_raw, result.unit_str, output_unit)
+			average = convert_unit(average_raw, result.unit, output_unit)
 			average = float("{0:.2f}".format(average))
 			average_raw = float("{0:.2f}".format(average_raw))
 			if (not result.test.full_name in db["targets"] or
@@ -188,7 +188,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 					db["metrics"][result.test.full_name] = []
 				db["commits"][commit.label]['reports'][report.name][result.test.full_name] = result
 				average_raw = result.result().mean()
-				average = convert_unit(average_raw, result.unit_str, output_unit)
+				average = convert_unit(average_raw, result.unit, output_unit)
 				score_sum += average
 				count += 1
 
@@ -493,7 +493,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 		result = db["commits"][commit]['reports'][report][test]
 		diff_target = "{0:.2f}".format(result.diff_target)
 	%>\\
-	, ${diff_target}, "${tooltip_commit_table(commit)}<h4>Perf</h4><table><tr><td><b>Test</b></td><td>${test}</td></tr><tr><td><b>Target</b></td><td>${db['targets'][test]} ${output_unit} (${diff_target}%)</td></tr><tr><td><b>Raw value</b></td><td>${result.average_raw} ${result.unit_str} +/- ${result.margin_str}% (n=${len(result.result())})</td></tr><tr><td><b>Converted value</b></td><td>${result.average} ${output_unit} +/- ${result.margin_str}% (n=${len(result.result())})</td></tr></table><br/>"\\
+	, ${diff_target}, "${tooltip_commit_table(commit)}<h4>Perf</h4><table><tr><td><b>Test</b></td><td>${test}</td></tr><tr><td><b>Target</b></td><td>${db['targets'][test]} ${output_unit} (${diff_target}%)</td></tr><tr><td><b>Raw value</b></td><td>${result.average_raw} ${result.unit} +/- ${result.margin_str}% (n=${len(result.result())})</td></tr><tr><td><b>Converted value</b></td><td>${result.average} ${output_unit} +/- ${result.margin_str}% (n=${len(result.result())})</td></tr></table><br/>"\\
 								% else:
 	, null, "${test}"\\
 								% endif
@@ -689,10 +689,10 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 												<%
 													r1 = db["commits"][commit]['reports'][report1.name][test]
 													r2 = db["commits"][commit]['reports'][report2.name][test]
-													perf_diff = compute_perf_difference(r1.unit_str, r1.average_raw, r2.average_raw)
+													perf_diff = compute_perf_difference(r1.unit, r1.average_raw, r2.average_raw)
 													perf_diff = "{0:.2f}".format(perf_diff)
 												%>
-							dataTable.addRows([['${test}', '${report1.name}', '${report2.name}', ${perf_diff}, "${r1.average_raw} => ${r2.average_raw} ${r1.unit_str}"]])
+							dataTable.addRows([['${test}', '${report1.name}', '${report2.name}', ${perf_diff}, "${r1.average_raw} => ${r2.average_raw} ${r1.unit}"]])
 												% endif
 											% endfor
 										% endif
@@ -716,10 +716,10 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 										% if (test in db["commits"][commit]['reports'][report1.name] and test in db["targets"]):
 										<%
 											r1 = db["commits"][commit]['reports'][report1.name][test]
-											perf_diff = compute_perf_difference(r1.unit_str, db["targets_raw"][test], r1.average_raw)
+											perf_diff = compute_perf_difference(r1.unit, db["targets_raw"][test], r1.average_raw)
 											perf_diff = "{0:.2f}".format(perf_diff)
 										%>\\
-dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_raw}(${report1.name}) => ${db["targets_raw"][test]}(target) ${r1.unit_str}"]])
+dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_raw}(${report1.name}) => ${db["targets_raw"][test]}(target) ${r1.unit}"]])
 										% endif
 									% endfor
 								% endif
