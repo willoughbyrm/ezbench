@@ -1232,6 +1232,10 @@ class Test:
             name += "]"
         return name
 
+    @classmethod
+    def metric_fullname(self, basename, metric_name):
+        return "{}.{}".format(basename, metric_name)
+
 class ListStats:
     def __init__(self, data):
         self.data = array(data)
@@ -1777,7 +1781,7 @@ class SubTestResult:
         if self.value_type != BenchSubTestType.METRIC:
             return Test.partial_name(self.test.full_name, [self.key])
         else:
-            return None
+            return Test.metric_fullname(self.test.full_name, self.key)
 
 class TestResult:
     def __init__(self, commit, test, testType, testFile, runFiles, metricsFiles):
