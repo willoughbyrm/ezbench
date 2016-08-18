@@ -2005,6 +2005,16 @@ class EventCommitRange:
         else:
             return hash(self.old) ^ hash(self.new)
 
+    def date(self):
+        if self.new == None:
+            return "{}".format(self.old.commit_date)
+        elif self.is_single_commit():
+            return "{}".format(self.new.commit_date)
+        elif self.old is not None:
+            return "between {} and {}".format(self.old.commit_date, self.new.commit_date)
+        else:
+            return "before {}".format(self.new.commit_date)
+
     def __str__(self):
         if self.new == None:
             return "commit {}".format(self.old.sha1)
