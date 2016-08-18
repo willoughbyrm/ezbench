@@ -26,7 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 from email.utils import parsedate_tz, mktime_tz
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 from datetime import datetime, timedelta
 from dateutil import relativedelta
 from array import array
@@ -2514,6 +2514,44 @@ class Report:
                         print("WARNING: enhance_report: unknown result type {}".format(result.value_type))
 
             commit_prev = commit
+
+    @classmethod
+    def event_tree(cls, reports):
+        events_tree = dict()
+        for report in reports:
+            r = report.name
+            if r not in events_tree:
+                    events_tree[r] = OrderedDict()
+
+            report.events = sorted(report.events, key=lambda e: e.commit_range.old.commit_date, reverse=True)
+            for e in report.events:
+                c = e.commit_range
+                if c not in events_tree[r]:
+                    events_tree[r][c] = OrderedDict()
+
+                t = e.event_type
+                if t not in events_tree[r][c]:
+                    events_tree[r][c][t] = OrderedDict()
+
+                test = e.test
+                if test is not None:
+                    if test not in events_tree[r][c][t]:
+                        events_tree[r][c][t][test] = list()
+
+                    events_tree[r][c][t][test].append(e)
+                else:
+                    events_tree[r][c][t][e] = None
+
+        # Order by severity
+        for r in events_tree:
+            for c in events_tree[r]:
+                for t in events_tree[r][c]:
+                    for test in events_tree[r][c][t]:
+                        if not isinstance(test, Event):
+                            sorted(events_tree[r][c][t][test], key=lambda e: e.significance)
+
+        return events_tree
+
 
 def readCsv(filepath):
     data = []
