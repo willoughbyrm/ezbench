@@ -89,7 +89,8 @@ def __env_add_result__(db, human_envs, report, commit, result):
 			db['env_sets'][result.test.full_name].append(new_entry)
 
 def reports_to_html(reports, output, output_unit = None, title = None,
-			   commit_url = None, verbose = False, reference_report = None):
+			   commit_url = None, verbose = False, reference_report = None,
+			   reference_commit = None):
 
 	# select the right unit
 	if output_unit is None:
@@ -110,11 +111,19 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 	db["target_result"] = dict()
 	human_envs = dict()
 
+	if reference_report is None and reference_commit is not None:
+		reference_report = reports[0]
+
 	# set all the targets
 	if reference_report is not None and len(reference_report.commits) > 0:
-		db['reference_name'] = "{} ({})".format(reference_report.name, reference_report.commits[-1].label)
+		if reference_commit is not None:
+			ref_commit = reference_report.find_commit_by_id(reference_commit)
+		else:
+			ref_commit = reference_report.commits[-1]
+
+		db['reference_name'] = "{} ({})".format(reference_report.name, ref_commit.label)
 		db['reference'] = reference_report
-		for result in reference_report.commits[-1].results:
+		for result in ref_commit.results:
 			average_raw = result.result().mean()
 			average = convert_unit(average_raw, result.unit_str, output_unit)
 			average = float("{0:.2f}".format(average))
@@ -125,7 +134,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 					db["targets_raw"][result.test.full_name] = average_raw
 					db["target_result"][result.test.full_name] = result
 
-			__env_add_result__(db, human_envs, reference_report, reference_report.commits[-1], result)
+			__env_add_result__(db, human_envs, reference_report, ref_commit, result)
 
 	for report in reports:
 		db["reports"].append(report)
@@ -1065,6 +1074,7 @@ if __name__ == "__main__":
 	parser.add_argument("--commit_url", help="HTTP URL pattern, {commit} contains the SHA1")
 	parser.add_argument("--quiet", help="Be quiet when generating the report", action="store_true")
 	parser.add_argument("--reference", help="Compare the test results to this reference report")
+	parser.add_argument("--reference_commit", help="Compare the test results to the specified commit of the reference report")
 	parser.add_argument("--restrict_commits", help="Restrict commits to this list (space separated)")
 	parser.add_argument("log_folder", nargs='+')
 	args = parser.parse_args()
@@ -1092,4 +1102,4 @@ if __name__ == "__main__":
 		reference = gen_report(args.reference, [])
 
 	reports_to_html(reports, args.output, args.unit, args.title,
-			   args.commit_url, not args.quiet, reference)
+			   args.commit_url, not args.quiet, reference, args.reference_commit)
