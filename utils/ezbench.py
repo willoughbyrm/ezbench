@@ -2437,8 +2437,7 @@ class Report:
                     test = result.subtest_fullname()
                     test_unit = result.test.unit
 
-                    if (result.value_type == BenchSubTestType.SUBTEST_FLOAT or
-                        result.value_type == BenchSubTestType.METRIC):
+                    if result.value_type == BenchSubTestType.SUBTEST_FLOAT:
 
                         # Do not care about any metric that is not Joules or Watts
                         # as they may not have the property of being instantaneous
@@ -2501,6 +2500,9 @@ class Report:
                                                                              result))
 
                         unittest_prev[subtest_name] = result
+                    elif result.value_type == BenchSubTestType.METRIC:
+                        # Do not bisect metrics, it is too early for this
+                        pass
                     elif result.value_type == BenchSubTestType.SUBTEST_IMAGE:
                         subtest_name = result.subtest_fullname()
 
