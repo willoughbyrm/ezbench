@@ -28,6 +28,8 @@
 
 #include "env_dump.h"
 
+#include <sys/resource.h>
+#include <sys/time.h>
 #include <pthread.h>
 #include <dirent.h>
 #include <stdlib.h>
@@ -96,6 +98,61 @@ metric_custom_add(char *name, float factor, float offset,
 	metric->type = METRIC_CUSTOM_POLLER;
 	metric->read_value = read_value;
 	return metric;
+}
+
+static float
+ru_process_value(struct metric_t *metric, double timestamp_ms,
+                 float calibrated_value)
+{
+	if (metric->prev_timestamp_ms == 0) {
+		return 0;
+	} else {
+		double time_diff_ms = timestamp_ms - metric->prev_timestamp_ms;
+		float val_diff = calibrated_value - metric->prev_value;
+
+		return val_diff / 10.0 / time_diff_ms;
+	}
+}
+
+static float
+poll_ru(struct metric_t *metric, double timestamp_ms)
+{
+	static double last_poll = 0;
+	static struct rusage usage;
+	uintptr_t field = (uintptr_t) metric->user;
+	struct timeval tv_null = {0}, tv;
+
+	if (timestamp_ms != last_poll) {
+		if (getrusage(RUSAGE_SELF, &usage)) {
+			perror("env_dump: getrusage");
+			usage.ru_utime = tv_null;
+			usage.ru_stime = tv_null;
+			usage.ru_maxrss = 0;
+		}
+		last_poll = timestamp_ms;
+	}
+
+	if (field < 2) {
+		if (field == 0)
+			tv = usage.ru_utime;
+		else if (field == 1)
+			tv = usage.ru_stime;
+
+		return tv.tv_sec * 1e6 + tv.tv_usec;
+	} else if (field == 2) {
+		return usage.ru_maxrss;
+	} else {
+		fprintf(stderr, "env_dump: poll_ru: invalid field number %"PRIuPTR"\n", field);
+		return -1.0;
+	}
+}
+
+static void
+add_rusage()
+{
+	metric_custom_add(strdup("ru_utime_self (%)"),  1, 0, poll_ru, ru_process_value, (void *)0);
+	metric_custom_add(strdup("ru_stime_self (%)"),  1, 0, poll_ru, ru_process_value, (void *)1);
+	metric_custom_add(strdup("ru_maxrss_self (MB)"), 1e-3, 0, poll_ru, NULL, (void *)2);
 }
 
 static void
@@ -350,6 +407,7 @@ _env_dump_metrics_init()
 	if (output_file == NULL)
 		return;
 
+	add_rusage();
 	add_hwmon();
 	add_rapl();
 
