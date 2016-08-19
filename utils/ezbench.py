@@ -389,10 +389,10 @@ class Testset:
 
 # Smart-ezbench-related classes
 class Criticality(Enum):
-    II = 0
-    WW = 1
-    EE = 2
-    DD = 3
+    DD = 4
+    II = 3
+    WW = 2
+    EE = 1
 
 class RunningMode(Enum):
     INITIAL = 0
@@ -487,6 +487,8 @@ class SmartEzbench:
         self._task_current = None
         self._task_list = None
 
+        self.min_criticality = Criticality.II
+
         # Create the log directory
         first_run = False
         if not readonly and not os.path.exists(self.log_folder):
@@ -514,10 +516,11 @@ class SmartEzbench:
     def __log(self, error, msg):
         time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log_msg = "{time}: ({error}) {msg}\n".format(time=time, error=error.name, msg=msg)
-        print(log_msg, end="")
-        if not self.readonly:
-            self.log_file.write(log_msg)
-            self.log_file.flush()
+        if error.value >= self.min_criticality.value:
+            print(log_msg, end="")
+            if not self.readonly:
+                self.log_file.write(log_msg)
+                self.log_file.flush()
 
     def __grab_lock(self):
         if self.readonly:
