@@ -787,7 +787,7 @@ class SmartEzbench:
 
             # First, read all the tests and aggregate them
             for test in task_tree[commit]["tests"]:
-                basename, subtests = Test.parse_name(test)
+                basename, subtests, metric = Test.parse_name(test)
                 if basename not in test_subtests:
                     test_subtests[basename] = set()
                 test_subtests[basename] |= set(subtests)
@@ -1207,21 +1207,31 @@ class Test:
     def __hash__(self):
         return hash(self.full_name) ^ hash(self.unit)
 
-    # returns (base_name, subtests=[])
+    # returns (base_name, subtests=[], metric)
     @classmethod
     def parse_name(cls, full_name):
         idx = full_name.find('[')
+        idx2 = full_name.find('<')
         if idx > 0:
             if full_name[-1] != ']':
                 print("WARNING: test name '{}' is invalid.".format(full_name))
 
             basename = full_name[0 : idx]
             subtests = full_name[idx + 1 : -1].split('|')
+            metric = None
+        elif idx2 > 0:
+            if full_name[-1] != '>':
+                print("WARNING: test name '{}' is invalid.".format(full_name))
+
+            basename = full_name[0 : idx2]
+            subtests = []
+            metric = full_name[idx2 + 1 : -1]
         else:
             basename = full_name
             subtests = []
+            metric = None
 
-        return (basename, subtests)
+        return (basename, subtests, metric)
 
     @classmethod
     def partial_name(self, basename, sub_tests):
