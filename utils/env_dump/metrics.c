@@ -37,7 +37,19 @@
 struct metric_t {
 	char *name;
 	void *user;
-	char *path;
+
+	enum metric_type_t {
+		METRIC_FILE_BACKED = 0,
+		METRIC_CUSTOM_POLLER = 1
+	} type;
+
+	union {
+		/* for type == METRIC_FILE_BACKED */
+		char *path;
+
+		/* for type == METRIC_CUSTOM_POLLER */
+		float (*read_value)(struct metric_t *metric, double timestamp_ms);
+	};
 
 	float factor;
 	float offset;
@@ -56,13 +68,14 @@ struct metric_t *metrics;
 uint32_t metrics_count = 0;
 FILE *output_file;
 
-static void
+static struct metric_t *
 metric_add(char *name, char *path, float factor, float offset,
 		   float (*process)(struct metric_t *metric, double, float), void *user)
 {
 	metrics = realloc(metrics, sizeof(struct metric_t) * (metrics_count + 1));
 	metrics[metrics_count].name = name;
 	metrics[metrics_count].user = user;
+	metrics[metrics_count].type = METRIC_FILE_BACKED;
 	metrics[metrics_count].path = path;
 	metrics[metrics_count].factor = factor;
 	metrics[metrics_count].offset = offset;
@@ -70,7 +83,19 @@ metric_add(char *name, char *path, float factor, float offset,
 
 	metrics[metrics_count].prev_timestamp_ms = 0;
 	metrics[metrics_count].prev_value = 0.0;
-	metrics_count++;
+
+	return &metrics[metrics_count++];
+}
+
+static struct metric_t *
+metric_custom_add(char *name, float factor, float offset,
+                  float (*read_value)(struct metric_t *metric, double timestamp_ms),
+                  float (*process)(struct metric_t *metric, double, float), void *user)
+{
+	struct metric_t *metric = metric_add(name, NULL, factor, offset, process, user);
+	metric->type = METRIC_CUSTOM_POLLER;
+	metric->read_value = read_value;
+	return metric;
 }
 
 static void
@@ -250,17 +275,29 @@ add_rapl()
 static float
 poll_metric(struct metric_t *metric, double timestamp_ms)
 {
-	long long val = _env_dump_read_file_intll(metric->path, 10);
-	float calib_val, final_val;
+	float val, calib_val = 0.0, final_val = 0.0;
 
-	if (val == -1)
-		return 0;
+	if (metric->type == METRIC_FILE_BACKED) {
+		long long v = _env_dump_read_file_intll(metric->path, 10);
+
+		if (v == -1)
+			goto error;
+
+		val = (float) v;
+	} else if (metric->type == METRIC_CUSTOM_POLLER) {
+		val = metric->read_value(metric, timestamp_ms);
+	} else {
+		fprintf(stderr, "env_dump: poll_metric: Unknown type %i\n", metric->type);
+		goto error;
+	}
 
 	calib_val = (val - metric->offset) * metric->factor;
 	if (metric->process)
 		final_val = metric->process(metric, timestamp_ms, calib_val);
 	else
 		final_val = calib_val;
+
+error:
 	metric->prev_timestamp_ms = timestamp_ms;
 	metric->prev_value = calib_val;
 
@@ -343,7 +380,8 @@ _env_dump_metrics_fini()
 		/* destroy the resources */
 		for (i = 0; i < metrics_count; i++) {
 			free(metrics[i].name);
-			free(metrics[i].path);
+			if (metrics[i].type == METRIC_FILE_BACKED)
+				free(metrics[i].path);
 		}
 		free(metrics);
 	}
