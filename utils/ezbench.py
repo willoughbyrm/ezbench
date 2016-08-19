@@ -1237,7 +1237,7 @@ class Test:
 
     @classmethod
     def metric_fullname(self, basename, metric_name):
-        return "{}.{}".format(basename, metric_name)
+        return "{}<{}>".format(basename, metric_name)
 
 class ListStats:
     def __init__(self, data):
