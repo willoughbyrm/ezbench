@@ -1160,7 +1160,7 @@ class SmartEzbench:
                 commit_sha1 = middle
                 severity = 1
                 event_prio = 1
-                test_name_to_run = str(e.subtest_name)
+                test_name_to_run = str(e.full_name)
                 runs = math.ceil((len(e.old_result) + len(e.new_result)) / 2)
             else:
                 print("schedule_enhancements: unknown event type {}".format(type(e).__name__))
@@ -2059,6 +2059,8 @@ class Event:
         self.subresult_key = subresult_key
         self.significance = significance
         self.short_desc = short_desc
+
+        self.full_name = Test.partial_name(test.full_name, [subresult_key])
 
     def __str__(self):
         if self.test is not None:
