@@ -2557,14 +2557,6 @@ class Report:
                 else:
                     events_tree[r][c][t][e] = None
 
-        # Order by severity
-        for r in events_tree:
-            for c in events_tree[r]:
-                for t in events_tree[r][c]:
-                    for test in events_tree[r][c][t]:
-                        if not isinstance(test, Event):
-                            sorted(events_tree[r][c][t][test], key=lambda e: e.significance)
-
         return events_tree
 
 
