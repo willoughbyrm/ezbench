@@ -1046,7 +1046,7 @@ class SmartEzbench:
         return commit_weight * test_weight * severity
 
     def schedule_enhancements(self, git_history=None, max_variance = 0.025,
-                              perf_diff_confidence = 0.95, smallest_perf_change=0.005,
+                              perf_diff_confidence = 0.99, smallest_perf_change=0.005,
                               max_run_count = 100, commit_schedule_max = 1):
         self.__log(Criticality.II, "Start enhancing the report")
 
@@ -2399,7 +2399,7 @@ class Report:
         return None
 
     def enhance_report(self, commits_rev_order, max_variance = 0.025,
-                       perf_diff_confidence = 0.95, smallest_perf_change=0.005):
+                       perf_diff_confidence = 0.99, smallest_perf_change=0.005):
         if len(commits_rev_order) > 0:
             # Get rid of the commits that are not in the commits list
             to_del = list()
