@@ -15,6 +15,7 @@ description Benchmarks to be run every night to test the rendering speed
 # Do not use the window mode to avoid compositing cost
 include GLB27:.*:1080p:offscreen 3
 include GLB30:.*:1080p:fullscreen 3
+include GFXB4:.*:1080p:fullscreen 3
 
 include unigine:.*:1080p:fullscreen 3
 
