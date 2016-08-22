@@ -2540,7 +2540,16 @@ class Report:
             if r not in events_tree:
                     events_tree[r] = OrderedDict()
 
-            report.events = sorted(report.events, key=lambda e: e.commit_range.old.commit_date, reverse=True)
+            has_history = True
+            for e in report.events:
+                if not hasattr(e.commit_range.old, "git_distance_head"):
+                    has_history = False
+                    break
+
+            if has_history:
+                report.events = sorted(report.events, key=lambda e: e.commit_range.old.git_distance_head)
+            else:
+                report.events = sorted(report.events, key=lambda e: e.commit_range.old.commit_date, reverse=True)
             for e in report.events:
                 c = e.commit_range
                 if c not in events_tree[r]:
