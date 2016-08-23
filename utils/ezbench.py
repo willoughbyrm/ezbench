@@ -2216,7 +2216,7 @@ class EventUnitResultUnstable(Event):
         msg = "{}: unstable results ({})"
         desc = msg.format(self.result.key, self.result.to_set())
 
-        super().__init__("unit test", EventCommitRange(result.commit), result.test, result.key, 2, desc)
+        super().__init__("variance", EventCommitRange(result.commit), result.test, result.key, 2, desc)
 
 class EventRenderingChange(Event):
     def __init__(self, commit_range, result, difference, confidence):
