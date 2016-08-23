@@ -763,6 +763,13 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 
 				% for c in db["events"][r]:
 					<%
+						# Let's not display variance in the events view as
+						# it is mostly noise for the people reading logs
+						# TODO: Move them to a common subsection per week
+						if (len(db["events"][r][c]) == 1 and
+							list(db["events"][r][c].keys())[0] == "variance"):
+							continue
+
 						key = key + 1
 						id = "events_" + str(key)
 
