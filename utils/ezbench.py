@@ -2060,7 +2060,10 @@ class Event:
         self.significance = significance
         self.short_desc = short_desc
 
-        self.full_name = Test.partial_name(test.full_name, [subresult_key])
+        if test is not None:
+            self.full_name = Test.partial_name(test.full_name, [subresult_key])
+        else:
+            self.full_name = "<not a test>"
 
     def __str__(self):
         if self.test is not None:
