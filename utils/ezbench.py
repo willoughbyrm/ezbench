@@ -2377,7 +2377,8 @@ class Report:
                     # Add the result to the commit's results
                     commit.results.append(result)
                     commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
-                except:
+                except Exception as e:
+                    sys.stderr.write(str(e))
                     pass
 
         # Sort the list of tests
