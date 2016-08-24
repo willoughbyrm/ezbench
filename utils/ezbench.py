@@ -1566,6 +1566,9 @@ class TestRun:
             if metric_name.lower() == "time":
                 continue
 
+            if unit.lower() == "rpm" or unit.lower() == "°c":
+                continue
+
             vals = list()
             timestamps = list()
             for v in range(0, len(values[field])):
