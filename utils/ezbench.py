@@ -1047,7 +1047,7 @@ class SmartEzbench:
 
     def schedule_enhancements(self, git_history=None, max_variance = 0.025,
                               perf_diff_confidence = 0.99, smallest_perf_change=0.005,
-                              max_run_count = 100, commit_schedule_max = 1):
+                              max_run_count = 20, commit_schedule_max = 1):
         self.__log(Criticality.II, "Start enhancing the report")
 
         # Generate the report, order commits based on the git history
