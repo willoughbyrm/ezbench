@@ -2704,7 +2704,7 @@ def convert_unit(value, input_unit, output_unit):
 		ir_fps = 1.0e6 / value
 
 	if ir_fps == -1:
-		print("convert_unit: Unknown input type " + input_unit)
+		print("convert_unit: Unknown input type '{}'".format(input_unit))
 		return value
 
 	if output_unit.lower() == "fps":
@@ -2719,7 +2719,7 @@ def convert_unit(value, input_unit, output_unit):
 	elif output_unit == "us" or output_unit == "µs":
 		return 1.0e6 / ir_fps
 
-	print("convert_unit: Unknown output type " + output_unit)
+	print("convert_unit: Unknown output type '{}'".format(output_unit))
 	return value
 
 def compute_perf_difference(unit, target, value):
