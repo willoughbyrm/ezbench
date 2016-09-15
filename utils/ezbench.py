@@ -1745,6 +1745,9 @@ class SubTestResult:
             for run in self.runs:
                 results.append(run.result(self.key).img_compare(old_subtestresult.average_image_file))
 
+            output = '{}_compare_{}'.format(self.average_image_file, os.path.basename(old_subtestresult.average_image_file))
+            imgcmp.compare(self.average_image_file, old_subtestresult.average_image_file, ['RMSE'], output)
+
             # Do the reverse comparaison because the distance has no direction
             # and the oldresult's average value should be 0 anyway
             new_results = ListStats(results)
