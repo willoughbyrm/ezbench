@@ -304,6 +304,7 @@ def reload_conf_handler(signum, frame):
 
 # parse the options
 parser = argparse.ArgumentParser()
+parser.add_argument("--embed", action="store_true")
 parser.add_argument("--http_server", help="Generate an HTTP interface to show the status of the reports. Format: listen_ip:port")
 args = parser.parse_args()
 
@@ -343,7 +344,8 @@ while not stop_requested:
                                                 "{}/logs/{}/index.html".format(ezbench_dir, sbench.report_name),
                                                 output_unit = "fps",
                                                 commit_url = sbench.commit_url(),
-                                                verbose = False)
+                                                verbose = False,
+                                                embed = args.embed)
                 print("Generated an HTML report in {:.2f} seconds".format(time.clock() - clock_start))
         except Exception as e:
             print(e)

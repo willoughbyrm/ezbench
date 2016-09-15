@@ -90,7 +90,7 @@ def __env_add_result__(db, human_envs, report, commit, result):
 
 def reports_to_html(reports, output, output_unit = None, title = None,
 			   commit_url = None, verbose = False, reference_report = None,
-			   reference_commit = None):
+			   reference_commit = None, embed = True):
 
 	# select the right unit
 	if output_unit is None:
@@ -263,10 +263,13 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 	<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
+	<%! import os %>
 	<%! import cgi %>
 	<%! import html %>
+	<%! import base64 %>
+	<%! import imgcmp %>
 	<%! import ezbench %>
-	<%! from ezbench import compute_perf_difference, BenchSubTestType, Event %>
+	<%! from ezbench import compute_perf_difference, BenchSubTestType, Event, EventRenderingChange %>
 
 	<html xmlns="http://www.w3.org/1999/xhtml">
 		<head>
@@ -807,7 +810,34 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 									%>\\
 <li><input type="checkbox" id="${id}" checked="${type_checked}"/><label class="tree_node" for="${id}">+ ${test.full_name} (${len(db["events"][r][c][t][test])} result(s))</label><ul>
 										% for e in db["events"][r][c][t][test]:
+										% if not isinstance(e, EventRenderingChange):
 <li>${html.escape(e.short_desc)}</li>
+										% else:
+											<%
+												# Reconstruct image path
+												new = e.result.average_image_file
+												old = new.replace(c.new.sha1, c.old.sha1)
+												diff = '{}_compare_{}'.format(new, os.path.basename(old))
+
+												old_image = ''
+												diff_image = ''
+												new_image = ''
+
+												if embed:
+													old_image = 'data:image/png;base64,' + base64.b64encode(open(old, 'rb').read()).decode()
+													diff_image = 'data:image/png;base64,' + base64.b64encode(open(diff, 'rb').read()).decode()
+													new_image = 'data:image/png;base64,' + base64.b64encode(open(new, 'rb').read()).decode()
+												else:
+													old_image = os.path.join(os.path.basename(old))
+													diff_image = os.path.join(os.path.basename(diff))
+													new_image = os.path.join(os.path.basename(new))
+											%>\\
+
+<li>${html.escape(e.short_desc)}</li>
+<img src="${old_image}" style="max-width:20%;">
+<img src="${diff_image}" style="max-width:20%;">
+<img src="${new_image}" style="max-width:20%;">
+										% endif
 										% endfor
 									</ul></li>
 								% else:
@@ -1102,8 +1132,9 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 
 		template = Template(html_template)
 		try:
-			html = template.render(title=title, db=db, output_unit=output_unit,
-			                       default_commit=list(db["commits"])[-1])
+			html = template.render(ezbench_dir=ezbench_dir, title=title, db=db,
+			                       output=output, output_unit=output_unit,
+					       default_commit=list(db["commits"])[-1], embed=embed)
 		except:
 			html = exceptions.html_error_template().render().decode()
 
