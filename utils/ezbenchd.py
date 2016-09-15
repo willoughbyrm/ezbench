@@ -63,7 +63,7 @@ def setup_http_server(bind_ip = "0.0.0.0", port = 8080):
             sbench = sbenches[sbench]
             report_name = sbench.report_name
         %>
-        <li>${report_name}: <a href="/report/${report_name}/">report</a>, <a href="/status/${report_name}/">status</a> (${sbench.running_mode().name})</li>
+        <li>${report_name}: <a href="/file/${report_name}/">report</a>, <a href="/status/${report_name}/">status</a> (${sbench.running_mode().name})</li>
         % endfor
     </ul>
 </body>
@@ -227,8 +227,6 @@ def setup_http_server(bind_ip = "0.0.0.0", port = 8080):
                 args = m.groups()[2]
 
                 if cmd != "" and report_name != "" and report_name in sbenches:
-                    if cmd == "report":
-                        return self.__serve_file__(report_name, "index.html", "text/html")
                     if cmd == "file":
                         return self.__serve_file__(report_name, args)
                     elif cmd == "mode" or cmd == "status":
