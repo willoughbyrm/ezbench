@@ -168,6 +168,15 @@ def setup_http_server(bind_ip = "0.0.0.0", port = 8080):
         def __serve_file__(self, report_name, filename, content_type = "text/plain"):
             msg = "unknown error"
 
+            if not filename:
+                filename = "index.html"
+
+            content_types = {"html": "text/html", "png": "image/png"}
+
+            extension = os.path.splitext(filename)[1][1:]
+            if extension in content_types:
+                content_type = content_types[extension]
+
             chroot_folder = "{}/logs/{}".format(ezbench_dir, report_name)
             path = "{}/{}".format(chroot_folder, filename)
             real_path = os.path.realpath(path)
