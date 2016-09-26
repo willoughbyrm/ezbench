@@ -1386,7 +1386,7 @@ class BenchSubTestType(Enum):
 
 class SubTestBase:
     def __init__(self, name, subtestType, averageValue, unit = None, data_raw_file = None):
-        self.name = name
+        self.name = sys.intern(name)
         self.subtest_type = subtestType
         self.value = averageValue
         self.unit = unit
