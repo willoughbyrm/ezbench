@@ -2408,6 +2408,13 @@ class Report:
                 return result
         return None
 
+    def find_result_by_name(self, commit, test_full_name):
+        for result in commit.results:
+            if result.test.full_name == test_full_name:
+                return result
+        return None
+
+
     def enhance_report(self, commits_rev_order, max_variance = 0.025,
                        perf_diff_confidence = 0.99, smallest_perf_change=0.005):
         if len(commits_rev_order) > 0:
