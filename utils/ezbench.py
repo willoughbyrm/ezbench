@@ -2663,62 +2663,6 @@ def readUnitRun(filepath):
                 tests[fields[0]] = fields[1].strip()
     return tests
 
-def getPerformanceResultsCommitTest(commit, test):
-    for result in commit.results:
-        if result.test != test:
-            continue
-
-        return array(result.data)
-
-    return array([])
-
-def getResultsTestDiffs(commits, test):
-    results = []
-
-    # Compute a report per application
-    i = 0
-    origValue = -1
-    for commit in commits:
-        resultFound = False
-        for result in commit.results:
-            if result.test != test:
-                continue
-
-            value = array(result.data).mean()
-            if origValue > -1:
-                diff = (value * 100.0 / origValue) - 100.0
-            else:
-                origValue = value
-                diff = 0
-
-            results.append([i, diff])
-            resultFound = True
-
-        if not resultFound:
-            results.append([i, NaN])
-        i = i + 1
-
-    return results
-
-def getResultsGeomDiffs(commits):
-    results = []
-
-    # Compute a report per application
-    i = 0
-    origValue = -1
-    for commit in commits:
-        value = commit.geom_mean()
-        if origValue > -1:
-            diff = (value * 100.0 / origValue) - 100.0
-        else:
-            origValue = value
-            diff = 0
-
-        results.append([i, diff])
-        i = i + 1
-
-    return results
-
 def convert_unit(value, input_unit, output_unit):
 	ir_fps = -1.0
 
