@@ -1386,6 +1386,11 @@ class BenchSubTestType(Enum):
 
 class SubTestBase:
     def __init__(self, name, subtestType, averageValue, unit = None, data_raw_file = None):
+        if unit is not None:
+            unit = sys.intern(unit)
+        if data_raw_file is not None:
+            data_raw_file = sys.intern(data_raw_file)
+
         self.name = sys.intern(name)
         self.subtest_type = subtestType
         self.value = averageValue
@@ -1394,7 +1399,7 @@ class SubTestBase:
 
 class SubTestString(SubTestBase):
     def __init__(self, name, value, data_raw_file = None):
-        super().__init__(name, BenchSubTestType.SUBTEST_STRING, value, None, data_raw_file)
+        super().__init__(name, BenchSubTestType.SUBTEST_STRING, sys.intern(value), None, data_raw_file)
 
 class SubTestFloat(SubTestBase):
     def __init__(self, name, unit, samples, data_raw_file = None):
