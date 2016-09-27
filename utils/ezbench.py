@@ -1385,6 +1385,8 @@ class BenchSubTestType(Enum):
     METRIC = 3
 
 class SubTestBase:
+    __slots__ = ['name', 'subtest_type', 'value', 'unit', 'data_raw_file']
+
     def __init__(self, name, subtestType, averageValue, unit = None, data_raw_file = None):
         if name is not None:
             name = sys.intern(name)
@@ -1404,6 +1406,8 @@ class SubTestString(SubTestBase):
         super().__init__(name, BenchSubTestType.SUBTEST_STRING, sys.intern(value), None, data_raw_file)
 
 class SubTestFloat(SubTestBase):
+    __slots__ = ['samples']
+
     def __init__(self, name, unit, samples, data_raw_file = None):
         self.samples = ListStats(samples)
 
@@ -1420,6 +1424,8 @@ class SubTestFloat(SubTestBase):
         return self.to_string(self.samples.mean(), self.unit, self.samples.margin(), len(self.samples))
 
 class Metric(SubTestFloat):
+    __slots__ = ['subtest_type', 'timestamps']
+
     def __init__(self, name, unit, samples, timestamps = None, data_raw_file = None):
         super().__init__(name, unit, samples, data_raw_file)
         self.subtest_type = BenchSubTestType.METRIC
@@ -1436,6 +1442,8 @@ class Metric(SubTestFloat):
             return 0
 
 class SubTestImage(SubTestBase):
+    __slots__ = ['img_file_name']
+
     def __init__(self, name, imgFileName, data_raw_file = None):
         super().__init__(name, BenchSubTestType.SUBTEST_IMAGE, None, None, data_raw_file)
         self.img_file_name = imgFileName
@@ -1450,6 +1458,8 @@ class SubTestImage(SubTestBase):
         return imgcmp.compare(self.img_file_name, imgFile, ['RMSE'], 'null:')
 
 class TestRun:
+    __slots__ = ['test_result', 'run_file', 'main_value_type', 'main_value', 'env_file', '_results']
+
     def __init__(self, testResult, testType, runFile, metricsFiles, mainValueType = None, mainValue = None):
         self.test_result = testResult
         self.run_file = runFile
@@ -1634,6 +1644,9 @@ class TestRun:
 
 
 class SubTestResult:
+    __slots__ = ['test_result', 'commit', 'test', 'key', 'runs', 'value_type',
+                 'unit', 'results', 'average_image_file', '_cache_list', '_cache_list_stats']
+
     def __init__(self, testResult, test, key, runs):
         self.test_result = testResult
         self.commit = testResult.commit
