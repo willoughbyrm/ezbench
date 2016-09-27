@@ -32,7 +32,7 @@ from dateutil import relativedelta
 from array import array
 from scipy import stats
 from enum import Enum
-from numpy import *
+import numpy as np
 import statistics
 import subprocess
 import threading
@@ -1161,7 +1161,7 @@ class SmartEzbench:
                 severity = 1
                 event_prio = 1
                 test_name_to_run = str(e.full_name)
-                runs = math.ceil((len(e.old_result) + len(e.new_result)) / 2)
+                runs = np.math.ceil((len(e.old_result) + len(e.new_result)) / 2)
             else:
                 print("schedule_enhancements: unknown event type {}".format(type(e).__name__))
                 continue
@@ -1251,7 +1251,7 @@ class Test:
 
 class ListStats:
     def __init__(self, data):
-        self.data = array(data)
+        self.data = np.array(data)
 
         # cached data
         self.invalidate_cache()
@@ -1277,9 +1277,9 @@ class ListStats:
     def __compute_stats__(self):
         if self._cache_mean is None or self._cache_std is None:
             if len(self.data) > 1:
-                self._cache_mean, var, self._cache_std = stats.bayes_mvs(array(self.data),
+                self._cache_mean, var, self._cache_std = stats.bayes_mvs(self.data,
                                                                          alpha=0.95)
-                if math.isnan(self._cache_mean[0]):
+                if np.math.isnan(self._cache_mean[0]):
                     self._cache_mean = (self.data[0], (self.data[0], self.data[0]))
                     self._cache_std = (0, (0, 0))
             else:
@@ -1314,8 +1314,7 @@ class ListStats:
             the number of samples needed to reach the wanted confidence
         """
 
-        data = self.data
-        if len(data) < 2 or data.var() == 0:
+        if len(self.data) < 2 or self.data.var() == 0:
             return 0, 2
 
         self.__compute_stats__()
@@ -1326,7 +1325,7 @@ class ListStats:
             # TODO: Get sigma from the test instead!
             sigma = (self._cache_std[1][1] - self._cache_std[1][0]) / 2
             target_margin = self._cache_mean[0] * wanted_margin
-            wanted_samples = math.ceil(self.__samples_needed__(sigma,
+            wanted_samples = np.math.ceil(self.__samples_needed__(sigma,
                                                                target_margin,
                                                                confidence))
 
@@ -1681,7 +1680,7 @@ class SubTestResult:
             if (run_result.value is None or
                 ((self.value_type == BenchSubTestType.SUBTEST_FLOAT or
                      self.value_type == BenchSubTestType.METRIC)
-                and math.isnan(run_result.value))):
+                and np.math.isnan(run_result.value))):
                 continue
             self.results.append((run, run_result.value))
 

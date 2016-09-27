@@ -252,7 +252,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 		db['env_diff_keys'][bench] = sorted(dict(final_union).keys())
 
 	# Sort the tests by name to avoid ever-changing layouts
-	db["tests"] = sort(db["tests"])
+	db["tests"] = np.sort(db["tests"])
 
 	# Support creating new URLs
 	if commit_url is not None:
