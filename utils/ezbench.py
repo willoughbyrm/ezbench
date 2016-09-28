@@ -1541,7 +1541,8 @@ class TestRun:
 
             # Do not try to open files bigger than 1MB
             if os.fstat(f.fileno()).st_size > 1e6:
-                raise ValueError('The metric file is too big (> 1MB)')
+                print('The metric file \'{}\' is too big (> 1MB)'.format(metric_file), file=sys.stderr)
+                return
 
             reader = csv.DictReader(f)
             try:
