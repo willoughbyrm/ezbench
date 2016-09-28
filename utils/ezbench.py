@@ -1877,7 +1877,7 @@ class TestResult:
             if self.test.unit != "undefined":
                 msg = "The unit used by the test '{test}' changed from '{unit_old}' to '{unit_new}' in commit {commit}"
                 print(msg.format(test=self.test.full_name,
-                                unit_old=test.unit,
+                                unit_old=self.test.unit,
                                 unit_new=self.unit,
                                 commit=self.commit.sha1))
             self.test.unit = unit
