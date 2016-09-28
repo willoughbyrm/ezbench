@@ -1674,15 +1674,15 @@ class SubTestResult:
                 self.value_type = run_result.subtest_type()
             elif self.value_type != run_result.subtest_type():
                 msg ="Tried to add a result (run file '{}') for the subtest '{}' with type {} to list only containing the type {}"
-                msg = msg.format(run_result.data_raw_file, subtest,
+                msg = msg.format(run_result.data_raw_file, key,
                                  run_result.subtest_type(), self.value_type)
                 raise ValueError(msg)
             if self.unit is None:
-                self.unit = run_result.unit
-            elif self.unit != run_result.unit:
+                self.unit = run_result.unit()
+            elif self.unit != run_result.unit():
                 msg ="Tried to add a result (run file '{}') for the subtest '{}' with unit '{}' to list only containing the unit '{}'"
-                msg = msg.format(run_result.data_raw_file, subtest,
-                                 run_result.unit, self.unit)
+                msg = msg.format(run_result.data_raw_file, key,
+                                 run_result.unit(), self.unit)
                 raise ValueError(msg)
 
             # Do not add empty samples
