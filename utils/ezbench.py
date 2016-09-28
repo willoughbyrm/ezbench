@@ -1384,37 +1384,41 @@ class BenchSubTestType(Enum):
     METRIC = 3
 
 class SubTestBase:
-    __slots__ = ['name', 'value', 'unit', 'data_raw_file']
+    __slots__ = ['name', 'value', 'data_raw_file']
 
-    def __init__(self, name, averageValue, unit = None, data_raw_file = None):
+    def __init__(self, name, averageValue, data_raw_file = None):
         if name is not None:
             name = sys.intern(name)
-        if unit is not None:
-            unit = sys.intern(unit)
         if data_raw_file is not None:
             data_raw_file = sys.intern(data_raw_file)
 
         self.name = name
         self.value = averageValue
-        self.unit = unit
         self.data_raw_file = data_raw_file
 
 class SubTestString(SubTestBase):
     def __init__(self, name, value, data_raw_file = None):
-        super().__init__(name, sys.intern(value), None, data_raw_file)
+        super().__init__(name, sys.intern(value), data_raw_file)
 
     def subtest_type(self):
         return BenchSubTestType.SUBTEST_STRING
 
+    def unit(self):
+        return None
+
 class SubTestFloat(SubTestBase):
-    __slots__ = ['samples']
+    __slots__ = ['_unit', 'samples']
 
     def __init__(self, name, unit, samples, data_raw_file = None):
         self.samples = ListStats(samples)
-        super().__init__(name, self.samples.mean(), unit, data_raw_file)
+        super().__init__(name, self.samples.mean(), data_raw_file)
+        self._unit = unit
 
     def subtest_type(self):
         return BenchSubTestType.SUBTEST_FLOAT
+
+    def unit(self):
+        return self._unit
 
     @classmethod
     def to_string(cls, mean, unit, margin, n):
@@ -1424,7 +1428,7 @@ class SubTestFloat(SubTestBase):
             return "{:.2f} {}".format(mean, unit)
 
     def __str__(self):
-        return self.to_string(self.samples.mean(), self.unit, self.samples.margin(), len(self.samples))
+        return self.to_string(self.samples.mean(), self.unit(), self.samples.margin(), len(self.samples))
 
 class Metric(SubTestFloat):
     __slots__ = ['timestamps']
@@ -1450,11 +1454,14 @@ class SubTestImage(SubTestBase):
     __slots__ = ['img_file_name']
 
     def __init__(self, name, imgFileName, data_raw_file = None):
-        super().__init__(name, None, None, data_raw_file)
+        super().__init__(name, None, data_raw_file)
         self.img_file_name = imgFileName
 
     def subtest_type(self):
         return BenchSubTestType.SUBTEST_IMAGE
+
+    def unit(self):
+        return None
 
     def image_file(self):
         return self.value
@@ -1851,7 +1858,7 @@ class TestResult:
 
         if unit is None:
             unit = "FPS"
-        self.unit = unit
+        self.unit = sys.intern(unit)
 
         # Check that we have the same unit as the test
         if self.test.unit != self.unit:
@@ -2168,7 +2175,7 @@ class EventPerfChange(Event):
 
         msg = "{} went from {:.2f} to {:.2f} {} ({:+.2f}%) with confidence p={:.2f}"
         desc = msg.format(key, self.old_result.mean(), self.new_result.mean(),
-                          self.new_result.unit,self.diff() * 100, self.confidence)
+                          self.new_result.unit, self.diff() * 100, self.confidence)
 
         super().__init__("perf", commit_range, old_result.test, old_result.key, abs(self.diff()), desc)
 
