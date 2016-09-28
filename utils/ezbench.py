@@ -1384,9 +1384,9 @@ class BenchSubTestType(Enum):
     METRIC = 3
 
 class SubTestBase:
-    __slots__ = ['name', 'subtest_type', 'value', 'unit', 'data_raw_file']
+    __slots__ = ['name', 'value', 'unit', 'data_raw_file']
 
-    def __init__(self, name, subtestType, averageValue, unit = None, data_raw_file = None):
+    def __init__(self, name, averageValue, unit = None, data_raw_file = None):
         if name is not None:
             name = sys.intern(name)
         if unit is not None:
@@ -1395,22 +1395,26 @@ class SubTestBase:
             data_raw_file = sys.intern(data_raw_file)
 
         self.name = name
-        self.subtest_type = subtestType
         self.value = averageValue
         self.unit = unit
         self.data_raw_file = data_raw_file
 
 class SubTestString(SubTestBase):
     def __init__(self, name, value, data_raw_file = None):
-        super().__init__(name, BenchSubTestType.SUBTEST_STRING, sys.intern(value), None, data_raw_file)
+        super().__init__(name, sys.intern(value), None, data_raw_file)
+
+    def subtest_type(self):
+        return BenchSubTestType.SUBTEST_STRING
 
 class SubTestFloat(SubTestBase):
     __slots__ = ['samples']
 
     def __init__(self, name, unit, samples, data_raw_file = None):
         self.samples = ListStats(samples)
+        super().__init__(name, self.samples.mean(), unit, data_raw_file)
 
-        super().__init__(name, BenchSubTestType.SUBTEST_FLOAT, self.samples.mean(), unit, data_raw_file)
+    def subtest_type(self):
+        return BenchSubTestType.SUBTEST_FLOAT
 
     @classmethod
     def to_string(cls, mean, unit, margin, n):
@@ -1423,12 +1427,14 @@ class SubTestFloat(SubTestBase):
         return self.to_string(self.samples.mean(), self.unit, self.samples.margin(), len(self.samples))
 
 class Metric(SubTestFloat):
-    __slots__ = ['subtest_type', 'timestamps']
+    __slots__ = ['timestamps']
 
     def __init__(self, name, unit, samples, timestamps = None, data_raw_file = None):
         super().__init__(name, unit, samples, data_raw_file)
-        self.subtest_type = BenchSubTestType.METRIC
         self.timestamps = timestamps
+
+    def subtest_type(self):
+        return BenchSubTestType.METRIC
 
     def exec_time(self):
         """
@@ -1444,8 +1450,11 @@ class SubTestImage(SubTestBase):
     __slots__ = ['img_file_name']
 
     def __init__(self, name, imgFileName, data_raw_file = None):
-        super().__init__(name, BenchSubTestType.SUBTEST_IMAGE, None, None, data_raw_file)
+        super().__init__(name, None, None, data_raw_file)
         self.img_file_name = imgFileName
+
+    def subtest_type(self):
+        return BenchSubTestType.SUBTEST_IMAGE
 
     def image_file(self):
         return self.value
@@ -1503,7 +1512,7 @@ class TestRun:
             self.__add_result__(SubTestString("", "complete", runFile))
 
     def __add_result__(self, subtest):
-        if subtest.subtest_type == BenchSubTestType.METRIC:
+        if subtest.subtest_type() == BenchSubTestType.METRIC:
             key = "metric_{}".format(subtest.name)
         else:
             key = subtest.name
@@ -1639,7 +1648,7 @@ class TestRun:
         if restrict_to_type is None:
             return self._results.keys()
         else:
-            return set([x for x in self._results if self._results[x].subtest_type == restrict_to_type])
+            return set([x for x in self._results if self._results[x].subtest_type() == restrict_to_type])
 
 
 class SubTestResult:
@@ -1662,11 +1671,11 @@ class SubTestResult:
             if run_result is None:
                 continue
             if self.value_type is None:
-                self.value_type = run_result.subtest_type
-            elif self.value_type != run_result.subtest_type:
+                self.value_type = run_result.subtest_type()
+            elif self.value_type != run_result.subtest_type():
                 msg ="Tried to add a result (run file '{}') for the subtest '{}' with type {} to list only containing the type {}"
                 msg = msg.format(run_result.data_raw_file, subtest,
-                                 run_result.subtest_type, self.value_type)
+                                 run_result.subtest_type(), self.value_type)
                 raise ValueError(msg)
             if self.unit is None:
                 self.unit = run_result.unit
