@@ -1563,7 +1563,11 @@ class TestRun:
                     for field in row:
                         if field not in values:
                             values[field] = list()
-                        values[field].append(float(row[field]))
+                        try:
+                            f = float(row[field])
+                            values[field].append(f)
+                        except ValueError as e:
+                            print("In file {}: cannot convert field {}'s value '{}' to float!".format(metric_file, field, row[field]))
             except csv.Error as e:
                 sys.stderr.write('file %s, line %d: %s\n' % (filepath, reader.line_num, e))
                 return
