@@ -1251,6 +1251,8 @@ class Test:
         return "{}<{}>".format(basename, metric_name)
 
 class ListStats:
+    __slots__ = ['data', '_cache_result', '_cache_mean', '_cache_std', '_cache_mean_simple']
+
     def __init__(self, data):
         self.data = np.array(data)
 
