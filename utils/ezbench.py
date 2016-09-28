@@ -36,6 +36,7 @@ import numpy as np
 import statistics
 import subprocess
 import threading
+import traceback
 import atexit
 import pprint
 import fcntl
@@ -2408,7 +2409,8 @@ class Report:
                     commit.results.append(result)
                     commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
                 except Exception as e:
-                    sys.stderr.write("TestResult creation error ({}): {}\n".format(type(e).__name__, str(e)))
+                    traceback.print_exc(file=sys.stderr)
+                    sys.stderr.write("\n")
                     pass
 
         # Sort the list of tests
