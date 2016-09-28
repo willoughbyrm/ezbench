@@ -33,6 +33,7 @@ from array import array
 from scipy import stats
 from enum import Enum
 import numpy as np
+import multiprocessing
 import statistics
 import subprocess
 import threading
@@ -2315,6 +2316,15 @@ class Report:
 
         return labels
 
+    def __parse_result_file__(self, commit, test, testType, testFile, runsFiles, metricsFiles):
+        try:
+            return TestResult(commit, test, testType, testFile, runsFiles, metricsFiles)
+        except Exception as e:
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.write("\n")
+            return None
+
+
     def __parse_report__(self, silentMode, restrict_to_commits):
         # Save the current working directory and switch to the log folder
         cwd = os.getcwd()
@@ -2361,6 +2371,10 @@ class Report:
             print ("Reading the results for {0} commits".format(len(commitsLines)))
         commits_txt = ""
         table_entries_txt = ""
+
+        thread_pool = multiprocessing.Pool()
+        tasks = []
+
         for commitLine in commitsLines:
             full_name = commitLine.strip(' \t\n\r')
             sha1 = commitLine.split()[0]
@@ -2412,17 +2426,18 @@ class Report:
                     for metric_file in [f for f,t in testFiles[sha1] if metrics_re.search(f)]:
                         metricsFiles[runFile].append(metric_file)
 
-                # Create the result object
-                try:
-                    result = TestResult(commit, test, testType, testFile, runsFiles, metricsFiles)
+                # Queue work!
+                t = thread_pool.apply_async(self.__parse_result_file__, (commit, test, testType, testFile, runsFiles, metricsFiles))
+                tasks.append(t)
 
-                    # Add the result to the commit's results
-                    commit.results.append(result)
-                    commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
-                except Exception as e:
-                    traceback.print_exc(file=sys.stderr)
-                    sys.stderr.write("\n")
-                    pass
+        # Wait for all the results to come in
+        for t in tasks:
+            # get the result of the task
+            result = t.get()
+
+            # Add the result to the commit's results
+            result.commit.results.append(result)
+            result.commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
 
         # Sort the list of tests
         self.tests = sorted(self.tests, key=lambda test: test.full_name)
