@@ -1832,7 +1832,6 @@ class TestResult:
         self.more_is_better = True
         self.unit = None
 
-        self._results = set()
         self.__parse_results__(testType, testFile, runFiles, metricsFiles)
 
     def __parse_results__(self, testType, testFile, runFiles, metricsFiles):
@@ -1857,7 +1856,6 @@ class TestResult:
 
         for i in range(0, len(runFiles)):
             run = TestRun(self, testType, runFiles[i], metricsFiles[runFiles[i]], unit, data[i])
-            self._results |= run.results()
             self.runs.append(run)
 
 
@@ -1879,13 +1877,10 @@ class TestResult:
 
         """
 
-        if restrict_to_type is None:
-            return self._results
-        else:
-            res = set()
-            for run in self.runs:
-                res |= run.results(restrict_to_type)
-            return res
+        res = set()
+        for run in self.runs:
+            res |= run.results(restrict_to_type)
+        return res
 
 
 class Commit:
