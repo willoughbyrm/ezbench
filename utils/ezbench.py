@@ -1864,6 +1864,10 @@ class TestResult:
         if len(data) == 0:
             raise ValueError("The TestResult {} does not contain any runs".format(testFile))
 
+        if len(data) != len(runFiles):
+            print("The test result {} does not contain all the runs ({} vs {}). Ignore data...".format(testFile, len(data), len(runFiles)), file=sys.stderr)
+            data = [-1] * len(runFiles)
+
         if unit is None:
             unit = "FPS"
         self.unit = sys.intern(unit)
