@@ -2401,7 +2401,7 @@ class Report:
                     commit.results.append(result)
                     commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
                 except Exception as e:
-                    sys.stderr.write(str(e))
+                    sys.stderr.write("TestResult creation error ({}): {}\n".format(type(e).__name__, str(e)))
                     pass
 
         # Sort the list of tests
