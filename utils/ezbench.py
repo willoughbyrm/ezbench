@@ -1833,8 +1833,6 @@ class TestResult:
         self.unit = None
 
         self._results = set()
-        self._cache_result = None
-
         self.__parse_results__(testType, testFile, runFiles, metricsFiles)
 
     def __parse_results__(self, testType, testFile, runFiles, metricsFiles):
@@ -1866,13 +1864,9 @@ class TestResult:
     def result(self, key = None):
         """ Returns the result associated to the key or None if it does not exist """
 
-        if self._cache_result is None:
-            self._cache_result = dict()
-        if key not in self._cache_result:
-            if len(self.runs) == 0:
-                raise ValueError('Cannot get the results when there are no runs ({})'.format(self.test_file))
-            self._cache_result[key] = SubTestResult(self, self.test, key, self.runs)
-        return self._cache_result[key]
+        if len(self.runs) == 0:
+            raise ValueError('Cannot get the results when there are no runs ({})'.format(self.test_file))
+        return SubTestResult(self, self.test, key, self.runs)
 
     def results(self, restrict_to_type = None):
         """
