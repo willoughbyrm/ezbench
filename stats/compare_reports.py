@@ -928,7 +928,7 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 							<th>Target</th>
 							%endif
 							% for commit in db["commits"]:
-							% if test in db["commits"][commit]['reports'][report.name]:
+							% if report.name in db["commits"][commit]['reports'] and test in db["commits"][commit]['reports'][report.name]:
 							<th>${commit}</th>
 							% endif
 							% endfor
