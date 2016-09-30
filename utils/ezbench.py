@@ -244,8 +244,8 @@ class Ezbench:
         return self.__run_ezbench(ezbench_cmd, ezbench_stdin, dry_run, verbose)
 
     def available_tests(self):
-        ezbench_cmd, ezbench_stdin = self.__ezbench_cmd_base(list_tests = True)
-        return self.__run_ezbench(ezbench_cmd, ezbench_stdin).tests
+        ezbench_cmd, ezbench_stdin = self.__ezbench_cmd_base(list_tests = True, dry_run = True)
+        return self.__run_ezbench(ezbench_cmd, ezbench_stdin, dry_run = True).tests
 
     def available_versions(self):
         ezbench_cmd, ezbench_stdin = self.__ezbench_cmd_base(list_built_versions = True)
