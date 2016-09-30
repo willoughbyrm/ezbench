@@ -86,6 +86,7 @@ function auto_deploy_make_and_deploy() {
         echo "$(date +"%m-%d-%Y-%T"): Done compiling version $version (exit code=$compile_error). Build time = $build_time."
 
         # Update our build time estimator
+        "$ezBenchDir/timing_DB/timing.py" -n build -k "$profile" -a $build_time
         local avgBuildTime=$(profile_repo_compilation_time)
         local avgBuildTime=$(bc <<< "0.75*$avgBuildTime + 0.25*$build_time")
         profile_repo_set_compilation_time $avgBuildTime
