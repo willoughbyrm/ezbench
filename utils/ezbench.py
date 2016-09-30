@@ -44,6 +44,7 @@ import time
 import json
 import glob
 import copy
+import math
 import csv
 import sys
 import os
@@ -2088,8 +2089,8 @@ class EventCommitRange:
             distance = self.distance()
             if distance == -1:
                 distance = "unkown"
-            return "commit range {}:{}({})".format(self.old.sha1, self.new.sha1,
-                                                   distance)
+            return "commit range {}:{}({}, ~{} steps)".format(self.old.sha1, self.new.sha1,
+                                                   distance, math.ceil(math.log2(distance)))
         else:
             return "commit before {}".format(self.new.full_name)
 
