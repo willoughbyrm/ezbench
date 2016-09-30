@@ -133,12 +133,13 @@ class Ezbench:
             ezbench_cmd.append("-l")
             return ezbench_cmd, ""
 
-        if list_built_versions:
-            ezbench_cmd.append("-L")
-            return ezbench_cmd, ""
-
         if self.profile is not None:
             ezbench_cmd.append("-P"); ezbench_cmd.append(self.profile)
+
+        if list_built_versions:
+            ezbench_cmd.append("-L")
+            ezbench_cmd.append("-k")
+            return ezbench_cmd, ""
 
         if self.repo_path is not None:
             ezbench_cmd.append("-p"); ezbench_cmd.append(self.repo_path)
