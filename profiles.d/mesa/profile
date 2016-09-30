@@ -32,14 +32,15 @@ function profile_repo_deployed_version() {
 #   - Fill the SHA1-db with all the information about the build when applicable
 function repo_compile_version() {
     prefix_dir=$(profile_repo_deployment_version_dir)
-    mkdir -p $prefix_dir
 
     ARGS=${REPO_MESA_PARAMETERS//\$REPO_MESA_PREFIX/$prefix_dir}
     echo "BUILD_INFO: build command: ./autogen.sh $ARGS"
     ./autogen.sh $ARGS || return 71
 
     make -j8 || return 71
+    mkdir -p $prefix_dir || return 72
     make_install_sha1_dump || return 72
+
     return 0
 }
 
