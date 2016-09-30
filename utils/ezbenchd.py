@@ -99,17 +99,17 @@ def setup_http_server(bind_ip = "0.0.0.0", port = 8080):
 
     total_time_left = 0
     if task_cur is not None:
-        time = task_cur.remaining_seconds()
-        if time is not None:
-            total_time_left += time.total_seconds()
+        time = task_cur.remaining_time().total_seconds()
+        if time > 0:
+            total_time_left += time
 
     if task_list is not None:
         for task in task_list:
             if task is None:
                 continue
-            time = task.remaining_seconds()
-            if time is not None:
-                total_time_left += time.total_seconds()
+            time = task.remaining_time().total_seconds()
+            if time > 0:
+                total_time_left += time
     total_time_left = timedelta(seconds=int(total_time_left))
 %>
 

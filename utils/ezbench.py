@@ -427,42 +427,59 @@ class TaskEntry:
         self.rounds = rounds
         self.start_date = None
         self.exec_time = None
+        self.build_time = None
 
     def started(self):
         self.start_date = datetime.now()
 
-    def set_timing_information(self, timingsDB):
+    def predicted_completion_time(self):
+        b = 0
+        if self.build_time is not None:
+            b = self.build_time
+
+        e = 0
+        if self.exec_time is not None:
+            e = self.exec_time
+
+        return timedelta(0, b + e)
+
+    def set_timing_information(self, timingsDB, compilation_time = None,
+                               available_versions = {}):
+        if compilation_time is not None and self.commit not in available_versions:
+            self.build_time = compilation_time
+
         time = timingsDB.data("test", self.test)
         if len(time) > 0:
-            self.exec_time = statistics.median(time)
+            self.exec_time = statistics.median(time) * self.rounds
         else:
             self.exec_time = None
 
-    def remaining_seconds(self):
-        if self.exec_time is None:
-            return None
-
-        total = timedelta(0, self.exec_time * self.rounds)
+    def remaining_time(self):
         if self.start_date is not None:
-            elapsed = timedelta(seconds=(datetime.now() - self.start_date).total_seconds())
+            elapsed = datetime.now() - self.start_date
         else:
             elapsed = timedelta(0)
-        return total - elapsed
+        return self.predicted_completion_time() - elapsed
 
     def __str__(self):
         string = "{}: {}: {} run(s)".format(self.commit, self.test, self.rounds)
 
-        if self.exec_time is not None:
-            total_delta = timedelta(0, self.exec_time * self.rounds)
+        total_delta = self.predicted_completion_time()
+        if total_delta.total_seconds() > 0:
+            remaining = self.remaining_time()
 
             if self.start_date is not None:
-                elapsed = timedelta(seconds=(datetime.now() - self.start_date).total_seconds())
-                progress = elapsed.total_seconds() * 100 / total_delta.total_seconds()
+                progress = 100.0 - (remaining.total_seconds() * 100 / total_delta.total_seconds())
 
-                seconds_left=timedelta(seconds=int((total_delta - elapsed).total_seconds()))
-                string += "({:.2f}%, {}s remaining)".format(progress, seconds_left)
+                if remaining.total_seconds() > 0:
+                    remaining_str = str(timedelta(0, math.ceil(remaining.total_seconds()))) + "s remaining"
+                else:
+                    remaining_str = str(timedelta(0, math.floor(-remaining.total_seconds()))) + "s overtime"
+
+                string += "({:.2f}%, {})".format(progress, remaining_str)
             else:
-                string += "(estimated exec time: {}s)".format(timedelta(0, int(total_delta.total_seconds())))
+                rounded_total_delta = timedelta(0, math.ceil(total_delta.total_seconds()))
+                string += "(estimated completion time: {}s)".format(rounded_total_delta)
         else:
             if self.start_date is not None:
                 string += "(started {} ago)".format(datetime.now() - self.start_date)
@@ -773,11 +790,22 @@ class SmartEzbench:
 
         db = TimingsDB(self.ezbench_dir + "/timing_DB")
 
+        # Get information about the build time and the available versions
+        ezbench = self.__create_ezbench()
+        versions = set(ezbench.available_versions())
+        c_ts = db.data("build", self.profile())
+        if len(c_ts) > 0:
+            c_t = statistics.median(c_ts)
+        else:
+            c_t = None
+
+        # the current task already has the timing information
         if c is not None:
-            c.set_timing_information(db)
+            versions |= set([c.commit])
         if tl is not None:
             for t in tl:
-                t.set_timing_information(db)
+                t.set_timing_information(db, c_t, versions)
+                versions |= set([t.commit])
         return c, tl
 
     def __prioritize_runs(self, task_tree, deployed_version):
@@ -958,6 +986,16 @@ class SmartEzbench:
                        "make {count} runs for test {test} using commit {commit}".format(count=e.rounds,
                                                                                                   commit=e.commit,
                                                                                                   test=short_name))
+
+            # Until we can read the output of core.sh on the fly, let's update
+            # the timings for the current task by emulating what EzBench does
+            ezbench = self.__create_ezbench()
+            versions = set(ezbench.available_versions())
+            db = TimingsDB(self.ezbench_dir + "/timing_DB")
+            total_time = statistics.median(db.data("build", self.profile()))
+            e.set_timing_information(db, total_time, versions)
+
+            # Start the task
             self._task_current.started()
             self._task_lock.release()
             run_info = ezbench.run([e.commit], [e.test + '$'], rounds=e.rounds)
