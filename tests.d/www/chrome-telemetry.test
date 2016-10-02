@@ -1,5 +1,5 @@
-hash "$TELEMETRY_FOLDER/run_benchmark" 2> /dev/null || return 1
-hash "$CHROME_PATH" 2> /dev/null || return 1
+[ -e "$TELEMETRY_FOLDER/run_benchmark" ] || return 1
+[ -e "$CHROME_PATH" ] || return 1
 
 function __telemetry__ {
     cd $TELEMETRY_FOLDER
