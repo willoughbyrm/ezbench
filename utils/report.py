@@ -506,7 +506,10 @@ class TestRun:
     def result(self, key = None):
         """ Returns the result associated to the key or None if it does not exist """
         if key is None:
-            return SubTestFloat(None, self.main_value_type, [self.main_value], self.test_result.test_file)
+            if self.main_value is not None:
+                return SubTestFloat(None, self.main_value_type, [self.main_value], self.test_result.test_file)
+            else:
+                return None
         if key in self._results:
             return self._results[key]
         else:
