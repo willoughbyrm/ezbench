@@ -37,7 +37,8 @@ import os
 ezbench_dir = os.path.abspath(sys.path[0]+'/../')
 sys.path.append(ezbench_dir+'/utils/')
 sys.path.append(ezbench_dir+'/utils/env_dump')
-from ezbench import *
+from ezbench import SmartEzbench
+from report import *
 from env_dump_parser import *
 
 # constants
