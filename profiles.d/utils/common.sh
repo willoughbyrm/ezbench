@@ -133,7 +133,7 @@ function xserver_reset() {
 
     xrandr --auto 2> /dev/null 2> /dev/null
 
-    return 0
+    return $?
 }
 
 function gui_start() {
@@ -197,7 +197,8 @@ function gui_reset() {
     [[ $dry_run -eq 1 ]] && return 0
 
     if [[ "$EZBENCH_CONF_X11" != "0" ]]; then
-        xserver_reset || return 1
+        xserver_reset
+        return $?
     fi
 
     return 0
