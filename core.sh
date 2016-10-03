@@ -754,6 +754,8 @@ done
 
 ) 201>"$logsFolder/lock"
 
+error_code=$?
+
 rm $abortFile 2> /dev/null
 if [ $? -eq 0 ]; then
 	echo "Early exit requested"
@@ -763,4 +765,9 @@ endTime=$(date +%s)
 runtime=$((endTime-startTime))
 printf "Actual run time: %02dh:%02dm:%02ds\n\n" $((runtime/3600)) $((runtime%3600/60)) $((runtime%60))
 
+exit $error_code
+
 ) 200>"$ezBenchDir/lock"
+
+error_code=$?
+exit $error_code
