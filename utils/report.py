@@ -610,7 +610,7 @@ class SubTestResult:
         else:
             s = self.to_set()
             if len(s) == 1:
-                return self.to_list()[0]
+                return str(self.to_list()[0])
             else:
                 return str(s)
 
