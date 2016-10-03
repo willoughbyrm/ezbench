@@ -71,6 +71,9 @@ function vt_switch_stop() {
 function xserver_setup_start() {
     [[ $dry_run -eq 1 ]] && return 1
 
+    # Early exit if the server is already running
+    [[ -n "$EZBENCH_X_PID" ]] && return 0
+
     # Check for dependencies
     has_automatic_sudo_rights || return 1
     has_binary Xorg || return 1
@@ -89,7 +92,7 @@ function xserver_setup_start() {
     fi
 
     local x_pid=$(sudo -n $ezBenchDir/profiles.d/utils/_launch_background.sh Xorg $xorg_config -configdir /no_conf_please/ -nolisten tcp -noreset $xorg_id vt5 -auth $xauthority 2> /dev/null) # TODO: Save the xorg logs
-    export EZBENCH_X_PID=$x_pid
+    EZBENCH_X_PID=$x_pid
 
     export DISPLAY=$xorg_id
     export XAUTHORITY=$xauthority
@@ -98,7 +101,10 @@ function xserver_setup_start() {
     for i in {0..50}
     do
         xset s off -dpms 2> /dev/null
-        [ $? -eq 0 ] && return 0
+        if [ $? -eq 0 ]; then
+            export EZBENCH_X_PID
+            return 0
+        fi
         sleep 0.1
     done
 
