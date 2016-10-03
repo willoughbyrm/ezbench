@@ -189,7 +189,12 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 					db["metrics"][result.test.full_name] = []
 				db["commits"][commit.label]['reports'][report.name][result.test.full_name] = result
 				average_raw = result.result().mean()
-				average = convert_unit(average_raw, result.unit, output_unit)
+				if average_raw is not None and result.unit is not None:
+					average = convert_unit(average_raw, result.unit, output_unit)
+				else:
+					average_raw = 0
+					average = 0
+					result.unit = "unknown"
 				score_sum += average
 				count += 1
 
