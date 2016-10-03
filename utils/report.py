@@ -950,7 +950,7 @@ class EventCommitRange:
             distance = self.distance()
             if distance == -1:
                 distance = "unkown"
-            return "commit range {}:{}({}, ~{} steps)".format(self.old.sha1, self.new.sha1,
+            return "commit range {}:{}({} commits, ~{} steps)".format(self.old.sha1, self.new.sha1,
                                                    distance, math.ceil(math.log2(distance)))
         else:
             return "commit before {}".format(self.new.full_name)
