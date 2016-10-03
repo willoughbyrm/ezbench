@@ -579,7 +579,9 @@ class SubTestResult:
             # Generate average
             images = []
             for run in runs:
-                images.append(run.result(self.key).img_file_name)
+                result = run.result(self.key)
+                if result is not None:
+                    images.append(result.img_file_name)
 
             # Generate the average image with the list of image files
             self.average_image_file = os.path.join(log_folder, '{}.{}.avg.png'.format(testResult.test_file, self.key))
@@ -587,8 +589,10 @@ class SubTestResult:
 
             # Compare every image to the average image
             for run in runs:
-                run.result(self.key).set_reference(self.average_image_file)
-                self.results.append((run, run.result(self.key).value))
+                result = run.result(self.key)
+                if result is not None:
+                    result.set_reference(self.average_image_file)
+                    self.results.append((run, result.value))
 
         self._cache_list = None
         self._cache_list_stats = None
