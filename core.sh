@@ -370,6 +370,11 @@ function __ezbench_finish__ {
     # Execute the user-defined post hook
     callIfDefined ezbench_post_hook
 
+    # Delete the locks, as sometimes we fail at tearing down ezbench entirely
+    # This will be fixed when we use cgroups to kill every process instead.
+    rm "$logsFolder/lock"
+    rm "$ezBenchDir/lock"
+
     if [ "$action" == "reboot" ]
     then
         printf "Rebooting with error code 74\n"
