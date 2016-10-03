@@ -146,11 +146,14 @@ function gui_start() {
 
     # Start the compositor
     if [ -n "$EZBENCH_CONF_COMPOSITOR" ]; then
+        # Early exit if the compositor is already running
+        [[ -n "$EZBENCH_COMPOSITOR_PID" ]] && return 0
+
         has_binary "${EZBENCH_CONF_COMPOSITOR}" || return 1
         has_binary "unbuffer" || return 1
 
         eval "unbuffer ${EZBENCH_CONF_COMPOSITOR} $EZBENCH_CONF_COMPOSITOR_ARGS &" 2> /dev/null > /dev/null
-        export EZBENCH_COMPOSITOR_PID=$!
+        EZBENCH_COMPOSITOR_PID=$!
 
         has_binary "wmctrl" || {
             sleep 2 # Give the compositor a chance to start
@@ -160,7 +163,10 @@ function gui_start() {
         local start=$(date +%s%3N)
         while /bin/true; do
             comp=$(wmctrl -m 2> /dev/null | grep 'Name' | cut -d ' ' -f 2)
-            [[ "$comp" == "$EZBENCH_CONF_COMPOSITOR_NAME" ]] && return 0
+            if [[ "$comp" == "$EZBENCH_CONF_COMPOSITOR_NAME" ]]; then
+                export EZBENCH_COMPOSITOR_PID
+                return 0
+            fi
             [ "$(($(date +%s%3N) - start))" -gt "5000" ] && break
             sleep 0.05
         done
