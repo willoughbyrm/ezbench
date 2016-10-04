@@ -656,7 +656,11 @@ class SmartEzbench:
             ezbench = self.__create_ezbench()
             versions = set(ezbench.available_versions())
             db = TimingsDB(self.ezbench_dir + "/timing_DB")
-            total_time = statistics.median(db.data("build", self.profile()))
+            build_times = db.data("build", self.profile())
+            if len(build_times) > 0:
+                total_time = statistics.median(build_times)
+            else:
+                total_time = 0
             e.set_timing_information(db, total_time, versions)
 
             # Start the task
