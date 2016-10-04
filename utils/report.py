@@ -45,6 +45,7 @@ import json
 import glob
 import copy
 import math
+import ast
 import csv
 import sys
 import os
@@ -366,6 +367,8 @@ class TestRun:
                 self.__add_result__(result)
         elif testType == "imgval":
             self.importImgTestRun(runFile)
+        elif testType == "unified":
+            self.importUnifiedTestRun(runFile)
         else:
             raise ValueError("Ignoring results because the type '{}' is unknown".format(testType))
 
@@ -382,6 +385,36 @@ class TestRun:
                     fullpath = os.path.join(self.test_result.commit.report.log_folder, frame_file)
                     self.__add_result__(SubTestImage(frameid, fullpath, runFile))
             self.__add_result__(SubTestString("", "complete", runFile))
+
+    def importUnifiedTestRun(self, runFile):
+        l_re = re.compile(r'^(.*): (.*)\((.*)\)( .*)?$')
+        with open(runFile, 'rt') as f:
+            for i, line in enumerate(f):
+                m = l_re.match(line)
+                if m is None:
+                    print("{}: invalid format at line {}: '{}'".format(runFile, i, line))
+                    continue
+
+                key, key_type, value, unit = m.groups()
+
+                if unit is not None:
+                    unit = unit.strip()
+
+                if key_type == "float":
+                    if unit is None:
+                        print("{}: Float type requires a unit at line {}".format(runFile, i))
+                        continue
+
+                    # handle lists of floats, if necessary
+                    value = ast.literal_eval(value)
+                    if type(value) is float:
+                        value = [value]
+
+                    self.__add_result__(SubTestFloat(key, unit, value, runFile))
+                elif key_type == "str":
+                    self.__add_result__(SubTestString(key, value, runFile))
+                elif key_type == "img":
+                    self.__add_result__(SubTestImage(key, value, runFile))
 
     def __add_result__(self, subtest):
         if subtest.subtest_type() == BenchSubTestType.METRIC:
@@ -728,32 +761,37 @@ class TestResult:
         self.__parse_results__(testType, testFile, runFiles, metricsFiles)
 
     def __parse_results__(self, testType, testFile, runFiles, metricsFiles):
-        # Read the data and abort if there is no data
-        data, unit, self.more_is_better = readCsv(testFile)
-        if len(data) == 0:
-            raise ValueError("The TestResult {} does not contain any runs".format(testFile))
+        if testType != "unified":
+            # Read the data and abort if there is no data
+            data, unit, self.more_is_better = readCsv(testFile)
+            if len(data) == 0:
+                raise ValueError("The TestResult {} does not contain any runs".format(testFile))
 
-        if len(data) != len(runFiles):
-            print("The test result {} does not contain all the runs ({} vs {}). Ignore data...".format(testFile, len(data), len(runFiles)), file=sys.stderr)
-            data = [-1] * len(runFiles)
+            if len(data) != len(runFiles):
+                print("The test result {} does not contain all the runs ({} vs {}). Ignore data...".format(testFile, len(data), len(runFiles)), file=sys.stderr)
+                data = [-1] * len(runFiles)
 
-        if unit is None:
-            unit = "FPS"
-        self.unit = sys.intern(unit)
+            if unit is None:
+                unit = "FPS"
+            self.unit = sys.intern(unit)
 
-        # Check that we have the same unit as the test
-        if self.test.unit != self.unit:
-            if self.test.unit != "undefined":
-                msg = "The unit used by the test '{test}' changed from '{unit_old}' to '{unit_new}' in commit {commit}"
-                print(msg.format(test=self.test.full_name,
-                                unit_old=self.test.unit,
-                                unit_new=self.unit,
-                                commit=self.commit.sha1))
-            self.test.unit = unit
+            # Check that we have the same unit as the test
+            if self.test.unit != self.unit:
+                if self.test.unit != "undefined":
+                    msg = "The unit used by the test '{test}' changed from '{unit_old}' to '{unit_new}' in commit {commit}"
+                    print(msg.format(test=self.test.full_name,
+                                    unit_old=self.test.unit,
+                                    unit_new=self.unit,
+                                    commit=self.commit.sha1))
+                self.test.unit = unit
 
-        for i in range(0, len(runFiles)):
-            run = TestRun(self, testType, runFiles[i], metricsFiles[runFiles[i]], unit, data[i])
-            self.runs.append(run)
+            for i in range(0, len(runFiles)):
+                run = TestRun(self, testType, runFiles[i], metricsFiles[runFiles[i]], unit, data[i])
+                self.runs.append(run)
+        else:
+            for i in range(0, len(runFiles)):
+                run = TestRun(self, testType, runFiles[i], metricsFiles[runFiles[i]], None, None)
+                self.runs.append(run)
 
 
     def result(self, key = None):
@@ -1213,7 +1251,7 @@ class Report:
         # Find all the result files and sort them by sha1
         files_list = os.listdir()
         testFiles = dict()
-        commit_test_file_re = re.compile(r'^(.+)_(bench|unit|imgval)_[^\.]+(.metrics_[^\.]+)?$')
+        commit_test_file_re = re.compile(r'^(.+)_(bench|unit|imgval|unified)_[^\.]+(.metrics_[^\.]+)?$')
         for f in files_list:
             if os.path.isdir(f):
                 continue
@@ -1249,13 +1287,21 @@ class Report:
                 continue
 
             # find all the tests
+            handled_tests = set()
             for testFile, testType in testFiles[sha1]:
-                # Skip when the file is a run file (finishes by #XX)
-                if re.search(r'#\d+$', testFile) is not None:
-                    continue
-
                 # Skip on unrelated files
                 if "." in testFile:
+                    continue
+
+                # Skip when the file is a run file (finishes by #XX)
+                if testType != "unified" and re.search(r'#\d+$', testFile) is not None:
+                    continue
+
+                # Unified-formated runs should not have the # in their name
+                testFile = testFile.split("#")[0]
+                if testFile not in handled_tests:
+                    handled_tests.add(testFile)
+                else:
                     continue
 
                 # Get the test name
