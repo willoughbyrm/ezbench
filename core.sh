@@ -644,7 +644,7 @@ do
         error_logs=${fps_logs}.errors
 
         # Find the first run id available
-        if [ -f "$fps_logs" ]; then
+        if [ -f "$fps_logs" ] || [ ${testType[$t]} == "unified" ]; then
             # The logs file exist, look for the number of runs
             run=0
             while [ -f "${fps_logs}#${run}" ]
@@ -688,50 +688,57 @@ do
             callIfDefined benchmark_run_post_hook
             callIfDefined "$postHookFuncName"
 
-            if [ -s "$run_log_file" ]; then
-                if [ ${testType[$t]} == "bench" ]; then
-                    # Add the reported values before adding the result to the average values for
-                    # the run.
-                    run_avg=$(awk '{sum=sum+$1} END {print sum/NR}' $run_log_file)
-                elif [ ${testType[$t]} == "unit" ]; then
-                    run_avg=$(head -n 1 $run_log_file)
-                elif [ ${testType[$t]} == "imgval" ]; then
-                    run_avg=0.0
+            if [ ${testType[$t]} != "unified" ]; then
+                if [ -s "$run_log_file" ]; then
+                    if [ ${testType[$t]} == "bench" ]; then
+                        # Add the reported values before adding the result to the average values for
+                        # the run.
+                        run_avg=$(awk '{sum=sum+$1} END {print sum/NR}' $run_log_file)
+                    elif [ ${testType[$t]} == "unit" ]; then
+                        run_avg=$(head -n 1 $run_log_file)
+                    elif [ ${testType[$t]} == "imgval" ]; then
+                        run_avg=0.0
+                    fi
+                    echo "$run_avg" >> "$fps_logs"
+
+                else
+                    echo "0" >> "$run_log_file"
+                    echo "0" >> "$fps_logs"
                 fi
-                echo "$run_avg" >> "$fps_logs"
-            else
-                echo "0" >> "$run_log_file"
-                echo "0" >> "$fps_logs"
             fi
         done
 
         # Process the data ourselves
-        output=$(tail -n +2 "$fps_logs") # Read back the data, minus the header
-        statistics=
-        result=$(callIfDefined "$processHookFuncName" "$output") || {
-            statistics=$(echo "$output" | "$ezBenchDir/fps_stats.awk")
-            result=$(echo "$statistics" | cut -d ' ' -f 1)
-            statistics=$(echo "$statistics" | cut -d ' ' -f 2-)
-        }
-        echo $result > $logsFolder/${version}_result_${testNames[$t]}
-        if [ -z "${testPrevFps[$t]}" ]; then
-            testPrevFps[$t]=$result
-        fi
-        if [ -z "${testInvert[$t]}" ]; then
-            fpsDiff=$(echo "scale=3;($result * 100.0 / ${testPrevFps[$t]}) - 100" | bc 2>/dev/null)
+        if [ ${testType[$t]} != "unified" ]; then
+            output=$(tail -n +2 "$fps_logs") # Read back the data, minus the header
+            statistics=
+            result=$(callIfDefined "$processHookFuncName" "$output") || {
+                statistics=$(echo "$output" | "$ezBenchDir/fps_stats.awk")
+                result=$(echo "$statistics" | cut -d ' ' -f 1)
+                statistics=$(echo "$statistics" | cut -d ' ' -f 2-)
+            }
+            echo $result > $logsFolder/${version}_result_${testNames[$t]}
+            if [ -z "${testPrevFps[$t]}" ]; then
+                testPrevFps[$t]=$result
+            fi
+            if [ -z "${testInvert[$t]}" ]; then
+                fpsDiff=$(echo "scale=3;($result * 100.0 / ${testPrevFps[$t]}) - 100" | bc 2>/dev/null)
+            else
+                fpsDiff=$(echo "scale=3;(100.0 * ${testPrevFps[$t]} / $result) - 100" | bc 2>/dev/null)
+            fi
+            [ $? -eq 0 ] && testPrevFps[$t]=$result
+            if (( $(bc -l <<< "$fpsDiff < -1.5" 2>/dev/null || echo 0) )); then
+                color=$bad_color
+            elif (( $(bc -l <<< "$fpsDiff > 1.5" 2>/dev/null || echo 0) )); then
+                color=$good_color
+            else
+                color="$meh_color"
+            fi
+            printf "%9.2f ${testUnit[$t]} ($color%+.2f%%$c_reset): %s\n" "$result" "$fpsDiff" "$statistics"
+            [ -z "$result" ] || fpsALL="$fpsALL $result"
         else
-            fpsDiff=$(echo "scale=3;(100.0 * ${testPrevFps[$t]} / $result) - 100" | bc 2>/dev/null)
+            printf "DONE\n"
         fi
-        [ $? -eq 0 ] && testPrevFps[$t]=$result
-        if (( $(bc -l <<< "$fpsDiff < -1.5" 2>/dev/null || echo 0) )); then
-            color=$bad_color
-        elif (( $(bc -l <<< "$fpsDiff > 1.5" 2>/dev/null || echo 0) )); then
-            color=$good_color
-        else
-            color="$meh_color"
-        fi
-        printf "%9.2f ${testUnit[$t]} ($color%+.2f%%$c_reset): %s\n" "$result" "$fpsDiff" "$statistics"
-        [ -z "$result" ] || fpsALL="$fpsALL $result"
     done
 
     # finish with the geometric mean (when we have multiple tests)
