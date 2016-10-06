@@ -7,6 +7,9 @@ hash "$RENDERCHECK" 2> /dev/null || return 1
 
 x11:rendercheck_run() {
     run_bench 0 "$RENDERCHECK" -r -f a8r8g8b8,x8r8g8b8 2>&1 > /dev/null | grep "^## " | sed 's/## \(.*\): \+\(.*\)/\1: str(\2)/g'
+
+    # Partial tests are not supported yet, so just say that the fact that the test ran entirely
+    echo ": str(complete)"
 }
 
 test_exec_time=300
