@@ -108,6 +108,9 @@ FINANCEBENCH_FOLDER=/opt/benchmarks/FinanceBench
 IGT_BENCHMARKS=/opt/intel-gpu-tools/benchmarks
 IGT_TRACES=/opt/intel-gpu-tools/traces
 
+# Rendercheck
+RENDERCHECK_FOLDER=/opt/benchmarks/rendercheck/
+
 # cairo-demos settings
 CAIRO_DEMOS=/opt/benchmarks/cairo-demos
 
