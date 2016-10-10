@@ -1660,11 +1660,9 @@ class Report:
 
     @classmethod
     def event_tree(cls, reports):
-        events_tree = dict()
+        events_tree = OrderedDict()
         for report in reports:
             r = report.name
-            if r not in events_tree:
-                    events_tree[r] = OrderedDict()
 
             has_history = True
             for e in report.events:
@@ -1678,29 +1676,32 @@ class Report:
                 report.events = sorted(report.events, key=lambda e: e.commit_range.commit_date(), reverse=True)
             for e in report.events:
                 c = e.commit_range
-                if c not in events_tree[r]:
-                    events_tree[r][c] = OrderedDict()
+                if c not in events_tree:
+                    events_tree[c] = OrderedDict()
 
                 t = e.event_type
-                if t not in events_tree[r][c]:
-                    events_tree[r][c][t] = OrderedDict()
+                if t not in events_tree[c]:
+                    events_tree[c][t] = OrderedDict()
 
-                test = e.test
-                if test is not None:
-                    if test not in events_tree[r][c][t]:
-                        events_tree[r][c][t][test] = list()
-
-                    events_tree[r][c][t][test].append(e)
+                if e.test is None:
+                    test = "ezbench.build"
                 else:
-                    events_tree[r][c][t][e] = None
+                    test = e.test.full_name
+                if test not in events_tree[c][t]:
+                    events_tree[c][t][test] = OrderedDict()
+
+                if r not in events_tree[c][t][test]:
+                    events_tree[c][t][test][r] = list()
+
+                events_tree[c][t][test][r].append(e)
 
         # Order by severity
-        for r in events_tree:
-            for c in events_tree[r]:
-                for t in events_tree[r][c]:
-                    for test in events_tree[r][c][t]:
+        for c in events_tree:
+            for t in events_tree[c]:
+                for r in events_tree[c][t]:
+                    for test in events_tree[c][t][r]:
                         if not isinstance(test, Event):
-                            sorted(events_tree[r][c][t][test], key=lambda e: e.significance)
+                            sorted(events_tree[c][t][r][test], key=lambda e: e.significance)
 
         return events_tree
 
