@@ -8,6 +8,13 @@ hash "$RENDERCHECK" 2> /dev/null || return 1
 x11:rendercheck_run() {
     run_bench 0 "$RENDERCHECK" -r -f a8r8g8b8,x8r8g8b8 2>&1 > /dev/null | grep "^## " | sed 's/## \(.*\): \+\(.*\)/\1: str(\2)/g'
 
+    # Go through all the subtests we wanted to get and check if all of them
+    # are present. If not, mark them as missing.
+    for subtest in "${run_sub_tests[@]}"; do
+        grep "$subtest" "$run_log_file" 2> /dev/null > /dev/null
+        [ $? -eq 1 ] && echo "$subtest: str(missing)"
+    done
+
     # Partial tests are not supported yet, so just say that the fact that the test ran entirely
     echo ": str(complete)"
 }
