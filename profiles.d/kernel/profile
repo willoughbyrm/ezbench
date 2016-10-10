@@ -52,7 +52,7 @@ function repo_compile_version() {
     has_binary lsb_release || return 72
 
     # Get the config file from the user_parameter file
-    cp "$REPO_LINUX_CONFIG" .config || return 71
+    sed "s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION=\"-ezbench_$version\"/g" "$REPO_LINUX_CONFIG" > .config || return 71
     echo "BUILD_INFO: build command: Using config '$REPO_LINUX_CONFIG' ($(sha1sum $REPO_LINUX_CONFIG))"
 
     # Compile the kernel. If any question arises, the default choice will be taken
@@ -153,7 +153,13 @@ function __default_make_and_deploy__() {
 function profile_repo_deployed_version() {
     # Transforms 4.3.0-rc2-10901-gbcb183d into bcb183d
     # This requires CONFIG_LOCALVERSION_AUTO=y
-    uname -r | cut -d 'g' -f 2
+
+    local v=$(uname -r | sed -n 's/.*-ezbench_\(.*\)/\1/g' | cut -d - -f 1)
+    if [ -n "$v" ]; then
+        echo $v
+    else
+        uname -r | cut -d 'g' -f 2
+    fi
 }
 
 rounds=3
