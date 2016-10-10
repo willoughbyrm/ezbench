@@ -1,0 +1,26 @@
+test -e "${APITRACE_BINARY}" || return 1
+test -e "${GLRETRACE_BINARY}" || return 1
+
+# 1 argument: $trace
+function __apitrace_benchmark_run__ {
+    local trace=$1
+    output=${run_log_file}_tmp
+
+    # FIXME: make sure the directory got created
+    mkdir -p "$output"
+
+    ENV_DUMP_RESTRICT_TO_BINARY="${GLRETRACE_BINARY}" \
+    run_bench 0 "${APITRACE_BINARY}" replay -b --fullscreen \
+    --loop="$(cat "$trace.loop.txt")" "$trace" | cut -d" " -f9
+}
+
+for trace in "${APITRACE_TRACE_FOLDER}/benchmark:"*.trace; do
+    test -f "$trace" || continue
+    test -f "$trace.loop.txt" || continue
+
+    name="apitrace:$(basename ${trace%.*})"
+    eval "${name}_run() { __apitrace_benchmark_run__ ${trace}; }"
+    test_name="$test_name ${name}"
+done
+
+test_exec_time=30
