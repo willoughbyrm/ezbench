@@ -871,6 +871,9 @@ class SmartEzbench:
                 event_prio = 1
                 test_name_to_run = str(e.full_name)
                 runs = np.math.ceil((len(e.old_result) + len(e.new_result)) / 2)
+            elif type(e) is EventUnitResultUnstable:
+                # Nothing to do, for now
+                continue
             else:
                 print("schedule_enhancements: unknown event type {}".format(type(e).__name__))
                 continue
