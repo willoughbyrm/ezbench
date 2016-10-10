@@ -1376,6 +1376,7 @@ class Report:
                 if self.commits[c].sha1 not in commits_rev_order:
                     to_del.append(c)
             for v in reversed(to_del):
+                print("Pruning the commit {} because it is not in the current history".format(self.commits[v].sha1))
                 del self.commits[v]
 
             # Add the index inside the commit
