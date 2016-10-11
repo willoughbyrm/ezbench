@@ -719,10 +719,7 @@ class SmartEzbench:
         return git_history
 
     def report(self, git_history=list(), reorder_commits = True,
-               cached_only = False, restrict_to_commits = []):
-        if cached_only:
-            return self._report_cached
-
+               restrict_to_commits = []):
         if reorder_commits and len(git_history) == 0:
             git_history = self.git_history()
 
@@ -780,11 +777,6 @@ class SmartEzbench:
         r = Report(self.log_folder, silentMode = True)
         r.enhance_report(commits_rev_order, max_variance, perf_diff_confidence,
                          smallest_perf_change)
-
-        # FIXME: Have a proper tracking of state changes to say if this cache
-        # is up to date or not. This could be used later to avoid parsing the
-        # report every time.
-        self._report_cached = r
 
         # Check all events
         tasks = []
@@ -920,3 +912,5 @@ class SmartEzbench:
         self.__release_lock()
 
         self.__log(Criticality.II, "Done enhancing the report")
+
+        return r
