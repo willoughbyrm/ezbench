@@ -165,6 +165,9 @@ function profile_repo_compile_start() {
     cd "$PROFILE_TMP_BUILD_DIR" || return 71
     git reset --hard "$1"
 
+    # The repo may contain submodules, init and update them too
+    git submodule update --init --recursive
+
     # Display information about the git tree
     git_sha1=$(git rev-parse --short HEAD)
     echo "BUILD_INFO, Repo type: git"
