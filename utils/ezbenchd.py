@@ -92,10 +92,9 @@ def setup_http_server(bind_ip = "0.0.0.0", port = 8080):
 <%
     from datetime import timedelta
 
-    report = sbench.report(cached_only = True)
     mode = sbench.running_mode().name
 
-    task_cur, task_list = sbench.task_info()
+    task_cur, task_list, events = sbench.task_info()
 
     total_time_left = 0
     if task_cur is not None:
@@ -149,8 +148,8 @@ def setup_http_server(bind_ip = "0.0.0.0", port = 8080):
 
     <h2>Events</h2>
     <ul>
-        % if report is not None:
-            % for event in report.events:
+        % if len(events) > 0:
+            % for event in events:
         <li>${event}</li>
             % endfor
         % else:

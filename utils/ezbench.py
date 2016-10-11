@@ -40,6 +40,7 @@ import glob
 import copy
 import math
 import sys
+import gc
 import os
 import re
 
@@ -170,6 +171,7 @@ class SmartEzbench:
         self._task_lock = threading.Lock()
         self._task_current = None
         self._task_list = None
+        self._events_str = None
 
         self.min_criticality = Criticality.II
 
@@ -470,7 +472,8 @@ class SmartEzbench:
             for t in tl:
                 t.set_timing_information(db, c_t, versions)
                 versions |= set([t.commit])
-        return c, tl
+
+        return c, tl, self._events_str
 
     def __prioritize_runs(self, task_tree, deployed_version):
         task_list = list()
@@ -594,7 +597,7 @@ class SmartEzbench:
         self.__log(Criticality.II, "All the dependencies are met, generate a report...")
 
         # Generate a report to compare the goal with the current state
-        report = Report(self.log_folder, silentMode = True)
+        report = self.report()
         self.__log(Criticality.II,
                    "The report contains {count} commits".format(count=len(report.commits)))
 
@@ -625,6 +628,10 @@ class SmartEzbench:
 
         task_tree_str = pprint.pformat(task_tree)
         self.__log(Criticality.II, "Task list: {tsk_str}".format(tsk_str=task_tree_str))
+
+        # Free all the memory we can before running the benchmarks
+        del report
+        gc.collect()
 
         # Let's start!
         if not self.__change_state_to_running__():
@@ -723,6 +730,13 @@ class SmartEzbench:
         r = Report(self.log_folder, silentMode = True,
                                  restrict_to_commits = restrict_to_commits)
         r.enhance_report([c.sha1 for c in git_history])
+
+        # Update the list of events with the most up to date report we have
+        events_str = []
+        for event in report.events:
+            _events_str.append(str(event))
+        self._events_str = events_str
+
         return r
 
     def __find_middle_commit__(self, git_history, old, new):
