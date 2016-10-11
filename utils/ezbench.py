@@ -730,8 +730,8 @@ class SmartEzbench:
 
         # Update the list of events with the most up to date report we have
         events_str = []
-        for event in report.events:
-            _events_str.append(str(event))
+        for event in r.events:
+            events_str.append(str(event))
         self._events_str = events_str
 
         return r

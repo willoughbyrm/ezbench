@@ -148,7 +148,7 @@ def setup_http_server(bind_ip = "0.0.0.0", port = 8080):
 
     <h2>Events</h2>
     <ul>
-        % if len(events) > 0:
+        % if events is not None and len(events) > 0:
             % for event in events:
         <li>${event}</li>
             % endfor
