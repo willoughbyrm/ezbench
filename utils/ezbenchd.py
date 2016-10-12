@@ -346,7 +346,8 @@ while not stop_requested:
                                                 embed = args.embed)
                 print("Generated an HTML report in {:.2f} seconds".format(time.clock() - clock_start))
         except Exception as e:
-            print(e)
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.write("\n")
             pass
 
     # TODO: Replace this by inotify
