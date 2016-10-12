@@ -29,6 +29,7 @@ from collections import namedtuple
 from datetime import datetime, timedelta
 from enum import Enum
 import numpy as np
+import multiprocessing
 import statistics
 import subprocess
 import threading
@@ -150,6 +151,8 @@ class TaskEntry:
                 string += "(no estimation available)"
 
         return string
+
+GitCommit = namedtuple('GitCommit', 'sha1 timestamp')
 
 class SmartEzbench:
     def __init__(self, ezbench_dir, report_name, readonly = False):
@@ -555,6 +558,7 @@ class SmartEzbench:
         self._task_lock.release()
         self.__release_lock()
 
+    @classmethod
     def __remove_task_from_tasktree__(self, task_tree, commit, full_name, rounds):
         if commit.sha1 not in task_tree:
             return False
@@ -570,6 +574,51 @@ class SmartEzbench:
             del task_tree[commit.sha1]
 
         return True
+
+    @classmethod
+    def __generate_task_and_events_list__(cls, q, state, log_folder, git_history):
+        exit_code = 1
+        task_tree = list()
+        events_str = []
+
+        # Make sure we catch *any* error, because we need to send stuff in the
+        # Queue if we do not want the parent process to get stuck
+        try:
+            # Generate the report, order commits based on the git history
+            try:
+                report = Report(log_folder, silentMode = True)
+                report.enhance_report([c.sha1 for c in git_history])
+            except Exception as e:
+                traceback.print_exc(file=sys.stderr)
+                sys.stderr.write("\n")
+                pass
+
+            # Get the list of events
+            events_str = []
+            for event in report.events:
+                events_str.append(str(event))
+
+            # Walk down the report and get rid of every run that has already been made!
+            task_tree = copy.deepcopy(state['commits'])
+            for commit in report.commits:
+                for result in commit.results:
+                    for key in result.results():
+                        full_name = Test.partial_name(result.test.full_name, [key])
+                        SmartEzbench.__remove_task_from_tasktree__(task_tree, commit, full_name, len(result.result(key)))
+
+            # Delete the tests on commits that do not compile
+            for commit in report.commits:
+                if commit.build_broken() and commit.sha1 in task_tree:
+                    del task_tree[commit.sha1]
+
+            exit_code = 0
+        except Exception as e:
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.write("\n")
+            pass
+
+        # Return the result
+        q.put((exit_code, task_tree, events_str))
 
     def run(self):
         self.__log(Criticality.II, "----------------------")
@@ -595,31 +644,14 @@ class SmartEzbench:
         self.__log(Criticality.II, "    - Deployed version: '{0}'".format(run_info.deployed_commit))
         self.__log(Criticality.II, "All the dependencies are met, generate a report...")
 
-        # Generate a report to compare the goal with the current state
-        report = self.report()
-        self.__log(Criticality.II,
-                   "The report contains {count} commits".format(count=len(report.commits)))
-
-        # Walk down the report and get rid of every run that has already been made!
-        task_tree = copy.deepcopy(self.state['commits'])
-        for commit in report.commits:
-            for result in commit.results:
-                self.__log(Criticality.DD,
-                           "Found {count} runs for test {test} using commit {commit}".format(count=len(result.result()),
-                                                                                                       commit=commit.sha1,
-                                                                                                       test=result.test.full_name))
-
-                for key in result.results():
-                    full_name = Test.partial_name(result.test.full_name, [key])
-                    self.__remove_task_from_tasktree__(task_tree, commit, full_name, len(result.result(key)))
-
-        # Delete the tests on commits that do not compile
-        for commit in report.commits:
-            if commit.build_broken() and commit.sha1 in task_tree:
-                self.__log(Criticality.II,
-                           "Cancelling the following runs because commit {} does not compile:".format(commit.sha1))
-                self.__log(Criticality.II, task_tree[commit.sha1])
-                del task_tree[commit.sha1]
+        # Generate a report to compare the goal with the current state. Run it
+        # in a separate process because python is really bad at freeing memory
+        q = multiprocessing.Queue()
+        p = multiprocessing.Process(target=SmartEzbench.__generate_task_and_events_list__,
+                                    args=(q, self.state, self.log_folder, self.git_history()))
+        p.start()
+        exit_code, task_tree, self._events_str = q.get()
+        p.join()
 
         if len(task_tree) == 0:
             self.__log(Criticality.II, "Nothing left to do, exit")
@@ -627,10 +659,6 @@ class SmartEzbench:
 
         task_tree_str = pprint.pformat(task_tree)
         self.__log(Criticality.II, "Task list: {tsk_str}".format(tsk_str=task_tree_str))
-
-        # Free all the memory we can before running the benchmarks
-        del report
-        gc.collect()
 
         # Let's start!
         if not self.__change_state_to_running__():
@@ -709,7 +737,6 @@ class SmartEzbench:
         output = subprocess.check_output(["/usr/bin/git", "log", "--first-parent", "--format=%h %ct"],
                                           cwd=run_info.repo_dir).decode().split('\n')
 
-        GitCommit = namedtuple('GitCommit', 'sha1 timestamp')
         for line in output:
             fields = line.split(' ')
             if len(fields) == 2:

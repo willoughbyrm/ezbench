@@ -27,6 +27,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
+import multiprocessing
 import argparse
 import signal
 import time
@@ -325,6 +326,20 @@ signal.signal(signal.SIGHUP, reload_conf_handler)
 reportStateModDate = dict()
 sbenches = dict()
 
+def sbench_run(report_name):
+    sbench = SmartEzbench(ezbench_dir, report_name)
+    report = sbench.schedule_enhancements()
+
+    # Generate an HTML with the report returned by schedule_enhancements
+    clock_start = time.clock()
+    compare_reports.reports_to_html([report],
+                                    "{}/logs/{}/index.html".format(ezbench_dir, sbench.report_name),
+                                    output_unit = "fps",
+                                    commit_url = sbench.commit_url(),
+                                    verbose = False,
+                                    embed = args.embed)
+    print("Generated an HTML report in {:.2f} seconds".format(time.clock() - clock_start))
+
 lastPoll = 0
 while not stop_requested:
     futureLastPoll = time.time()
@@ -339,17 +354,14 @@ while not stop_requested:
                 sbench = sbenches[report_name]
             if sbench.running_mode() == RunningMode.RUN:
                 sbench.run()
-                report = sbench.schedule_enhancements()
 
-                # Generate an HTML with the report returned by schedule_enhancements
-                clock_start = time.clock()
-                compare_reports.reports_to_html([report],
-                                                "{}/logs/{}/index.html".format(ezbench_dir, sbench.report_name),
-                                                output_unit = "fps",
-                                                commit_url = sbench.commit_url(),
-                                                verbose = False,
-                                                embed = args.embed)
-                print("Generated an HTML report in {:.2f} seconds".format(time.clock() - clock_start))
+                # Run the report generation in a separate process because python
+                # is really bad at freeing memory
+                p = multiprocessing.Process(target=sbench_run,
+                                    args=(report_name,))
+                p.start()
+                p.join()
+
         except Exception as e:
             traceback.print_exc(file=sys.stderr)
             sys.stderr.write("\n")
