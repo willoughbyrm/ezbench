@@ -105,8 +105,9 @@ POLYBENCH_ACC_FOLDER=/opt/benchmarks/PolyBench-ACC
 FINANCEBENCH_FOLDER=/opt/benchmarks/FinanceBench
 
 # intel-gpu-tools settings
-IGT_BENCHMARKS=/opt/intel-gpu-tools/benchmarks
-IGT_TRACES=/opt/intel-gpu-tools/traces
+IGT_ROOT=/opt/intel-gpu-tools/
+IGT_BENCHMARKS=$IGT_ROOT/benchmarks
+IGT_TRACES=$IGT_ROOT/traces
 
 # Rendercheck
 RENDERCHECK_FOLDER=/opt/benchmarks/rendercheck/
