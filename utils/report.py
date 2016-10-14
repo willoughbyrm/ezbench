@@ -598,6 +598,10 @@ class SubTestResult:
                                  run_result.unit(), self.unit)
                 raise ValueError(msg)
 
+            # Do not add the results of images, we need to process them first
+            if self.value_type == BenchSubTestType.SUBTEST_IMAGE:
+                continue
+
             # Do not add empty samples
             if (run_result.value is None or
                 ((self.value_type == BenchSubTestType.SUBTEST_FLOAT or
