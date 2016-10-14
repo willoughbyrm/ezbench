@@ -56,7 +56,7 @@ def create_new_branch(repo, base_commit, branch_name, template, state, max_commi
 		# Treat every variable independently
 		changes = False
 		if random.random() > 0.98:
-			state['perf'] = int(state['perf'] * (1.0075 + random.randn() / 10))
+			state['perf'] = int(state['perf'] * (1.0075 + np.random.randn() / 10))
 			changes = True
 		if not state['build_broken'] and random.random() > 0.995:
 			state['build_broken'] = True

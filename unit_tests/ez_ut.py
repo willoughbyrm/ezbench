@@ -109,7 +109,7 @@ def check_commit_variance(actual, measured, max_variance):
 	return abs(actual - measured) < max_variance * actual
 
 def do_stats(data, unit):
-	adata = array(data)
+	adata = np.array(data)
 	mean, var, std = stats.bayes_mvs(adata, alpha=0.95)
 	margin = (mean[1][1] - mean[1][0]) / 2 / mean[0]
 	msg = "{:.2f}{}, +/- {:.2f} (std={:.2f}, min={:.2f}{}, max={:.2f}{})"
