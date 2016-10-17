@@ -93,10 +93,13 @@ function run_bench {
     cmd="LIBGL_DEBUG=verbose vblank_mode=0 stdbuf -oL timeout $timeout"
     bench_binary=$(echo "$1" | rev | cut -d '/' -f 1 | rev)
 
-    env_dump_path="$ezBenchDir/utils/env_dump/env_dump.so"
-    if [ -f "$env_dump_path" ]; then
+    env_dump_path="$ezBenchDir/utils/env_dump"
+    env_dump_lib="$env_dump_path/env_dump.so"
+    env_dump_launch="$env_dump_path/env_dump.sh"
+    env_dump_extend="$env_dump_path/env_dump_extend.sh"
+
+    if [ -f "$env_dump_lib" ]; then
         run_log_file_env_dump="$run_log_file"
-        env_dump_launch="$ezBenchDir/utils/env_dump/env_dump.sh"
         cmd="$cmd $env_dump_launch "$run_log_file" $@"
     else
         cmd="$cmd $@"
@@ -111,8 +114,8 @@ function run_bench {
     eval $cmd > "$run_log_file_stdout" 2> "$run_log_file_stderr"
     local exit_code=$?
 
-    if [ -f "$env_dump_path" ]; then
-        $ezBenchDir/utils/env_dump/env_dump_extend.sh "$SHA1_DB" "$run_log_file.env_dump"
+    if [ -f "$env_dump_lib" ]; then
+        $env_dump_extend "$SHA1_DB" "$run_log_file.env_dump"
     fi
 
     local time_after=$(date +%s.%N)
