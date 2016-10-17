@@ -44,15 +44,13 @@ import gc
 import os
 import re
 
-from runner import *
-from testset import Testset
-from report import *
+ezbench_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import ezbench from the timings/ folder
-timing_dir = os.path.abspath(sys.path[0]+"/../timing_DB/")
-if not os.path.isdir(timing_dir):
-    timing_dir = os.path.abspath(sys.path[0]+"/timing_DB/")
-sys.path.append(timing_dir)
+sys.path.append(os.path.join(ezbench_dir, 'timing_DB'))
+
+from ezbench.testset import *
+from ezbench.report import *
+from ezbench.runner import *
 from timing import *
 
 # Smart-ezbench-related classes

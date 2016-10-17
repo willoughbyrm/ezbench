@@ -51,15 +51,15 @@ import sys
 import os
 import re
 
-from runner import EzbenchExitCode
-import imgcmp
+ezbench_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import ezbench from the timings/ folder
-timing_dir = os.path.abspath(sys.path[0]+"/../timing_DB/")
-if not os.path.isdir(timing_dir):
-    timing_dir = os.path.abspath(sys.path[0]+"/timing_DB/")
-sys.path.append(timing_dir)
+sys.path.append(os.path.join(ezbench_dir, 'timing_DB'))
+
+from ezbench.runner import *
 from timing import *
+
+from ezbench import imgcmp
+
 class Test:
     def __init__(self, full_name, unit="undefined"):
         self.full_name = full_name

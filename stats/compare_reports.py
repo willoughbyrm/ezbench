@@ -34,12 +34,14 @@ import sys
 import os
 
 # Import ezbench from the utils/ folder
-ezbench_dir = os.path.abspath(sys.path[0]+'/../')
-sys.path.append(ezbench_dir+'/utils/')
-sys.path.append(ezbench_dir+'/utils/env_dump')
-from ezbench import SmartEzbench
-from report import *
-from env_dump_parser import *
+ezbench_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+sys.path.append(os.path.join(ezbench_dir, 'python-modules'))
+sys.path.append(ezbench_dir)
+
+from utils.env_dump.env_dump_parser import *
+from ezbench.smartezbench import *
+from ezbench.report import *
 
 # constants
 html_name="index.html"
@@ -273,9 +275,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 	<%! import cgi %>
 	<%! import html %>
 	<%! import base64 %>
-	<%! import imgcmp %>
-	<%! import ezbench %>
-	<%! from ezbench import compute_perf_difference, BenchSubTestType, Event, EventRenderingChange %>
+	<%! from ezbench.smartezbench import compute_perf_difference, BenchSubTestType, Event, EventRenderingChange %>
 
 	<html xmlns="http://www.w3.org/1999/xhtml">
 		<head>

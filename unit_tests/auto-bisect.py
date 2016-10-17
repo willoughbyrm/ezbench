@@ -36,9 +36,9 @@ import sys
 import os
 
 # Import ezbench from the utils/ folder
-ezbench_dir = os.path.abspath(sys.path[0] + "/../")
-sys.path.append(ezbench_dir + '/utils/')
-from ezbench import *
+ezbench_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.join(ezbench_dir, 'python-modules'))
+from ezbench.smartezbench import *
 
 # parse the options
 parser = argparse.ArgumentParser()

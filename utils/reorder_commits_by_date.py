@@ -27,12 +27,17 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-from ezbench import *
 import subprocess
 import argparse
 import shutil
 import sys
 import os
+
+ezbench_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+sys.path.append(os.path.join(ezbench_dir, 'python-modules'))
+
+from ezbench import *
 
 # Start by checking what the user wants to monitor!
 parser = argparse.ArgumentParser()
