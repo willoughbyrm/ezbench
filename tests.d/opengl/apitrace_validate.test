@@ -15,6 +15,7 @@ function __apitrace_validate_run__ {
 
     for result in "$output/frame"*; do
         test -f "$result" || continue
+        test -f "$trace.calls.txt" || continue
 
         # Do not store the file as ${run_log_file}.${frameid} because we may
         # get a lot of duplication. Instead, store it under its own SHA to
