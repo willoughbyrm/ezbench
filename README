@@ -239,7 +239,7 @@ needed if you want to test the kernel as you need to reboot.
 	After=systemd-user-sessions.service getty@tty1.service plymouth-quit.service
 
 	[Service]
-	ExecStart=/.../ezbench/utils/ezbenchd.py
+	ExecStart=/.../ezbench/ezbenchd.py
 	User=$USER
 	Group=$USER
 
