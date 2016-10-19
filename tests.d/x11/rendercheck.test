@@ -3,7 +3,7 @@ test_type="unified"
 
 RENDERCHECK="$RENDERCHECK_FOLDER/rendercheck"
 
-hash "$RENDERCHECK" 2> /dev/null || return 1
+[ -e "$RENDERCHECK" ] || return 1
 
 x11:rendercheck_run() {
     run_bench 0 "$RENDERCHECK" -r -f a8r8g8b8,x8r8g8b8 2>&1 > /dev/null | grep "^## " | sed 's/## \(.*\): \+\(.*\)/\1: str(\2)/g'
