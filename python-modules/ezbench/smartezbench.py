@@ -553,6 +553,7 @@ class SmartEzbench:
         self._task_current = None
         self._task_list = None
         self._task_lock.release()
+        self.__release_lock()
 
     def __remove_task_from_tasktree__(self, task_tree, commit, full_name, rounds):
         if commit.sha1 not in task_tree:
