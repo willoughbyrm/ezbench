@@ -1,7 +1,7 @@
 test_name=perf_bisect
 test_exec_time=1
 
-[ -z "$REPO_PERF_BISECT" ] && return 1
+[ ! -d "$REPO_PERF_BISECT" ] && return 1
 
 perf_bisect_run() {
     # Set $REPO_PERF_BISECT in user_parameters.sh
