@@ -29,7 +29,7 @@ function __piglit_run__ {
     local exit_code=$?
 
     # generate a report, first print the passrate on the first line, then print the individual results
-    python3 - << END
+    python3 - 2> ${run_log_file}.processing_stderr << END
 import sys
 import six
 
