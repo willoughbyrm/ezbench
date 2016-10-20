@@ -30,6 +30,7 @@ function __piglit_run__ {
 
     # generate a report, first print the passrate on the first line, then print the individual results
     python3 - 2> ${run_log_file}.processing_stderr << END
+import traceback
 import sys
 import six
 
@@ -37,20 +38,27 @@ sys.path.append("$PIGLIT_RUN_PARAMS")
 from framework import summary, status, core, backends, exceptions
 from framework.programs import parsers
 
-testrun = backends.load("${piglit_output}")
-
 tests=list()
 pass_count = 0
-for name, result in six.iteritems(testrun.tests):
-    for key, value in six.iteritems(result.subtests):
-        tests.append("{}<{}>: {}".format(name, key, value))
-        if value == 'pass':
-            pass_count += 1
-    tests.append("{}: {}".format(name, result.result))
-    if result.result == 'pass':
-        pass_count += 1
 
-print("{:.3f}".format(pass_count / len(tests)))
+try:
+    testrun = backends.load("${piglit_output}")
+
+    for name, result in six.iteritems(testrun.tests):
+        for key, value in six.iteritems(result.subtests):
+            tests.append("{}<{}>: {}".format(name, key, value))
+            if value == 'pass':
+                pass_count += 1
+        tests.append("{}: {}".format(name, result.result))
+        if result.result == 'pass':
+            pass_count += 1
+except Exception as e:
+    traceback.print_exc(file=sys.stderr)
+
+if len(tests) > 0:
+    print("{:.3f}".format(pass_count / len(tests)))
+else:
+    print("0")
 for test in tests:
     print(test)
 END
