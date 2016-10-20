@@ -67,7 +67,13 @@ class RunningMode(Enum):
     PAUSE = 2
     ERROR = 3
     ABORT = 4
-    RUNNING = 5
+
+    # Intermediate steps, going from RUN to RUNNING or RUNNING to PAUSE/ABORT
+    INTERMEDIATE = 100
+    RUNNING = 101
+    PAUSING = 102
+    ABORTING = 103
+
 
 def list_smart_ezbench_report_names(ezbench_dir, updatedSince = 0):
     log_dir = ezbench_dir + '/logs'
@@ -194,12 +200,6 @@ class SmartEzbench:
                     "Created report '{report_name}' in {log_folder}".format(report_name=report_name,
                                                                             log_folder=self.log_folder))
 
-        # Set the state to RUN if the mode is RUNNING but it is not currently running
-        if (self.state['mode'] == RunningMode.RUNNING.value and
-            not Ezbench(self.ezbench_dir, report_name=self.report_name).reportIsLocked()):
-                self.set_running_mode(RunningMode.RUN)
-
-
     def __log(self, error, msg):
         time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log_msg = "{time}: ({error}) {msg}\n".format(time=time, error=error.name, msg=msg)
@@ -299,19 +299,30 @@ class SmartEzbench:
         self.__release_lock()
         return ret
 
-    def running_mode(self):
-        return RunningMode(self.__read_attribute__('mode', RunningMode.INITIAL.value))
+    def __running_mode_unlocked__(self, check_running = True):
+        mode = self.__read_attribute_unlocked__('mode', RunningMode.INITIAL.value) % RunningMode.INTERMEDIATE.value
+
+        if check_running and Ezbench(self.ezbench_dir, report_name=self.report_name).reportIsLocked():
+            mode += RunningMode.INTERMEDIATE.value
+
+        return RunningMode(mode)
+
+    def running_mode(self, check_running = True):
+        self.__reload_state(keep_lock=True)
+        ret = self.__running_mode_unlocked__()
+        self.__release_lock()
+        return ret
 
     def set_running_mode(self, mode):
-        if mode == RunningMode.RUNNING:
-            self.__log(Criticality.EE, "Ezbench running mode cannot manually be set to 'RUNNING'")
+        if mode.value >= RunningMode.INTERMEDIATE.value:
+            self.__log(Criticality.EE, "Ezbench mode cannot manually be set to '{}'".format(mode.name))
             return False
 
         self.__reload_state(keep_lock=True)
 
-        # Request an early exit if we go from RUNNING to PAUSE
-        cur_mode = RunningMode(self.__read_attribute_unlocked__('mode'))
-        if cur_mode == RunningMode.RUNNING and mode == RunningMode.PAUSE:
+        # Request an early exit if we go from RUNNING to PAUSE or
+        cur_mode = self.__running_mode_unlocked__()
+        if cur_mode.value > RunningMode.INTERMEDIATE.value and mode != RunningMode.RUN:
             Ezbench.requestEarlyExit(self.ezbench_dir, self.report_name)
 
         self.__write_attribute_unlocked__('mode', mode.value, allow_updates = True)
@@ -518,7 +529,7 @@ class SmartEzbench:
     def __change_state_to_run__(self):
         self.__reload_state(keep_lock=True)
         ret = False
-        running_state=RunningMode(self.__read_attribute_unlocked__('mode', RunningMode.INITIAL.value))
+        running_state=self.__running_mode_unlocked__()
         if running_state == RunningMode.INITIAL or running_state == RunningMode.RUNNING:
             self.__write_attribute_unlocked__('mode', RunningMode.RUN.value, allow_updates = True)
             self.__log(Criticality.II, "Ezbench running mode set to RUN")
@@ -532,27 +543,7 @@ class SmartEzbench:
         self.__release_lock()
         return ret
 
-    def __change_state_to_running__(self):
-        self.__reload_state(keep_lock=True)
-        ret = False
-        running_state=RunningMode(self.__read_attribute_unlocked__('mode', RunningMode.INITIAL.value))
-        if running_state == RunningMode.INITIAL or running_state == RunningMode.RUN:
-            self.__write_attribute_unlocked__('mode', RunningMode.RUNNING.value, allow_updates = True)
-            self.__log(Criticality.II, "Ezbench running mode set to RUNNING")
-            ret = True
-        else:
-            self.__log(Criticality.II,
-                       "We cannot run when the current running mode is {mode}.".format(mode=running_state.name))
-            ret = False
-        self.__release_lock()
-        return ret
-
     def __done_running__(self):
-        self.__reload_state(keep_lock=True)
-        running_state=RunningMode(self.__read_attribute_unlocked__('mode'))
-        if running_state == RunningMode.RUNNING or running_state == RunningMode.RUN:
-            self.__write_attribute_unlocked__('mode', RunningMode.RUN.value, allow_updates = True)
-
         self._task_current = None
         self._task_list = None
         self._task_lock.release()
@@ -660,10 +651,8 @@ class SmartEzbench:
         task_tree_str = pprint.pformat(task_tree)
         self.__log(Criticality.II, "Task list: {tsk_str}".format(tsk_str=task_tree_str))
 
-        # Let's start!
-        if not self.__change_state_to_running__():
-            return False
-        self.state['beenRunBefore'] = True
+        # Lock the report for further changes (like for profiles)
+        self.__write_attribute__('beenRunBefore', True)
 
         # Prioritize --> return a list of commits to do in order
         self._task_lock.acquire()
@@ -671,10 +660,10 @@ class SmartEzbench:
 
         # Start generating ezbench calls
         while len(self._task_list) > 0:
-            running_mode = self.running_mode()
-            if running_mode != RunningMode.RUNNING:
+            running_mode = self.running_mode(check_running = False)
+            if running_mode != RunningMode.RUN:
                 self.__log(Criticality.II,
-                       "Running mode changed from RUNNING to {mode}. Exit...".format(mode=running_mode.name))
+                       "Running mode changed from RUN(NING) to {mode}. Exit...".format(mode=running_mode.name))
                 self.__done_running__()
                 return False
 
