@@ -221,7 +221,7 @@ class Ezbench:
 
     def available_versions(self):
         ezbench_cmd, ezbench_stdin = self.__ezbench_cmd_base(list_built_versions = True)
-        return self.__run_ezbench(ezbench_cmd, ezbench_stdin).avail_versions
+        return self.__run_ezbench(ezbench_cmd, ezbench_stdin, dry_run = True).avail_versions
 
     def reportIsLocked(self):
         if self.report_name is None:
