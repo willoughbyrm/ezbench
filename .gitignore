@@ -7,3 +7,4 @@ logs/
 SHA1_DB/db/
 user_parameters.sh
 lock
+timing_DB/db.json
