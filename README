@@ -71,7 +71,7 @@ Another important note about core.sh is that it is highly modular and
 hook-based. Have a look at profiles.d/$profile/conf.d/README for the
 documentation about the different hooks.
 
-It is possible to adjust the execution environnement of the benchmarks by asking
+It is possible to adjust the execution environment of the benchmarks by asking
 core.sh to execute one or multiple scripts before running anything else. This
 for example allows users to specify which compositor should be used.
 

@@ -54,7 +54,7 @@ def break_lists(input_list, sep=" "):
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", dest='tests', help="<test regexp> include these tests to run",
                     action="append")
-parser.add_argument("-B", dest='tests_exclude', help="<test regexp> exclude these benchamrks from running",
+parser.add_argument("-B", dest='tests_exclude', help="<test regexp> exclude these benchmarks from running",
                     action="append")
 parser.add_argument("-t", dest='testsets', help="Test sets to run", action="append")
 parser.add_argument("-T", dest='list_testsets', help="List the available testsets", action="store_true")
