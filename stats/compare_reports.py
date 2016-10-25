@@ -822,7 +822,7 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 											<%
 												# Reconstruct image path
 												new = e.result.average_image_file
-												old = new.replace(c.new.sha1, c.old.sha1)
+												old = new.replace(e.commit_range.new.sha1, e.commit_range.old.sha1)
 												diff = '{}_compare_{}'.format(new, os.path.basename(old))
 
 												old_image = ''
