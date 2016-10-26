@@ -69,6 +69,9 @@ function resolve_SHA1() {
 		distro="${distro}_${distro_version}"
 	fi
 
+	local OIFS="$IFS"
+	IFS=$'\n'
+
 	# resolve the SHA1 of the EXE
 	exe_line=$(grep -e '^EXE,' $dump_file)
 	filename=$(echo "$exe_line" | cut -d ',' -f 2)
@@ -102,6 +105,8 @@ function resolve_SHA1() {
 		version=$(get_binary_version "$filename" "$sha1")
 		sed -i "s\`$line\`$line,$version\`g" $dump_file
 	done
+
+	IFS="$OIFS"
 
 	return 0
 }
