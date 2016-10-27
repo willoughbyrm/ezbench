@@ -140,7 +140,7 @@ update_cache ()
 	fi
 	wget -O - "$src" > "${dst}.bak"
     else
-	curl -s "$src" > "${dst}.bak"
+	curl -Ls "$src" > "${dst}.bak"
     fi
     sed -n 's/.*CHIPSET(\(.*\))$/\1/p' <  "${dst}.bak" > "$dst"
     rm "${dst}.bak"
