@@ -956,6 +956,14 @@ class EventCommitRange:
     def is_single_commit(self):
         return self.distance() <= 1
 
+    def commit_date(self):
+        if self.old is not None:
+            return self.old.commit_date
+        elif self.new is not None:
+            return self.new.commit_date
+        else:
+            return datetime.min
+
     def distance(self):
         if self.old == self.new:
             return 0
@@ -1523,7 +1531,7 @@ class Report:
             if has_history:
                 report.events = sorted(report.events, key=lambda e: e.commit_range.old.git_distance_head)
             else:
-                report.events = sorted(report.events, key=lambda e: e.commit_range.old.commit_date, reverse=True)
+                report.events = sorted(report.events, key=lambda e: e.commit_range.commit_date(), reverse=True)
             for e in report.events:
                 c = e.commit_range
                 if c not in events_tree[r]:

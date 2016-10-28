@@ -792,7 +792,7 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 						label = html.escape(label)
 						type_checked = len(db["events"][r][c]) == 1
 
-						commit_date = c.old.commit_date
+						commit_date = c.commit_date()
 						week = "{}-{}".format(commit_date.year, commit_date.isocalendar()[1])
 					%>
 					% if week != week_prev:
