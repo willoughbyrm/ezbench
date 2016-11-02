@@ -139,6 +139,9 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 
 			__env_add_result__(db, human_envs, reference_report, ref_commit, result)
 
+	for report in reports:
+		report.events = [e for e in report.events if not isinstance(e, EventResultNeedsMoreRuns)]
+
 	db["events"] = Report.event_tree(reports)
 
 	for report in reports:
