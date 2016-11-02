@@ -103,7 +103,8 @@ done <<< "all  ''
 	dpms '-t dpms -t kms_flip'
 	blc '-t pm_backlight'"
 
-for f in "$IGT_ROOT/tests/**/*.testlist"; do
+for f in "$IGT_ROOT/tests/"**/*.testlist; do
+	[ -e "$f" ] || continue
 	_bn=$(basename $f)
 	_dn=$(basename $(dirname $f))
 	name="piglit:igt:${_dn}/${_bn%.testlist}"
