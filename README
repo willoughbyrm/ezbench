@@ -53,6 +53,10 @@ To run the xserver, you will need the following applications:
  - xrandr
  - xset
 
+To get visual feedback when compiling, you will need:
+ - twm
+ - xterm
+
 If you want to use specify which compositor should be run, you will need to
 install the following applications:
  - unbuffer
