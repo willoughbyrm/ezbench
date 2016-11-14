@@ -154,7 +154,8 @@ function profile_repo_deployed_version() {
     # Transforms 4.3.0-rc2-10901-gbcb183d into bcb183d
     # This requires CONFIG_LOCALVERSION_AUTO=y
 
-    local v=$(uname -r | sed -n 's/.*-ezbench_\(.*\)/\1/g' | cut -d - -f 1)
+    local v=$(uname -r | sed 's/.*-ezbench_\([a-f0-9]\+\).*/\1/g' | cut -d - -f 1)
+
     if [ -n "$v" ]; then
         echo $v
     else
