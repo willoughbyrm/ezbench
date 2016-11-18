@@ -1520,7 +1520,7 @@ class Report:
 
     def find_commit_by_id(self, sha1):
         for commit in self.commits:
-            if commit.sha1 == sha1:
+            if commit.sha1 == sha1 or commit.full_sha1 == sha1:
                 return commit
         return None
 
