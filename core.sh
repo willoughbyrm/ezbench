@@ -543,6 +543,24 @@ bad_color=$c_bright_red
 good_color=$c_bright_green
 meh_color=$c_bright_yellow
 
+function write_to_journal {
+    local journal="$logsFolder/journal"
+    local operation=$1
+    local key=$2
+    shift 2
+
+    time=$(date +"%s.%6N")
+    echo -n "$time,$operation,$key" >> "$journal"
+
+    while [ "${1+defined}" ]; do
+        echo -n ",$1" >> "$journal"
+        shift
+    done
+    echo "" >> "$journal"
+
+    sync
+}
+
 function compile_and_deploy {
     # Accessible variables
     # $version     [RO]: SHA1 id of the current version
@@ -563,6 +581,8 @@ function compile_and_deploy {
     [ $? -eq 0 ] && [[ "$deployed_version" =~ "$version" ]] && return 0
 
     compile_logs=$logsFolder/${version}_compile_log
+
+    write_to_journal deploy $version_full
 
     # Compile the version and check for failure. If it failed, go to the next version.
     export REPO_COMPILE_AND_DEPLOY_VERSION=$version
@@ -632,8 +652,13 @@ do
     # Exit if asked to
     [ -e "$abortFile" ] && continue
 
+    # Get the full version name
+    # TODO: Always use the full version, to prevent collisions
+    version_full=$(profile_repo_version_from_human $version)
+
     # compile and deploy the version
     compile_and_deploy $version
+    write_to_journal deployed $version_full
 
     # Iterate through the tests
     fpsALL=""
@@ -686,7 +711,9 @@ do
             callIfDefined benchmark_run_pre_hook
 
             # This function will return multiple fps readings
+            write_to_journal test "$version_full" "${testNames[$t]}"
             "$runFuncName" > "$run_log_file" 2> /dev/null
+            write_to_journal tested "$version_full" "${testNames[$t]}"
 
             callIfDefined benchmark_run_post_hook
             callIfDefined "$postHookFuncName"
