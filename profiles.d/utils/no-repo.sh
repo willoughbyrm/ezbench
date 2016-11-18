@@ -53,6 +53,13 @@ function profile_repo_version_to_human() {
    echo "$1"
 }
 
+# MANDATORY: Print the full name of the version
+# Inputs:
+#   - $repoDir
+function profile_repo_version_from_human() {
+   echo "$1"
+}
+
 # Print the version pointed by the tip of the repo (HEAD for git for example)
 # Only mandatory if your repo supports compiling/deploying versions
 # Inputs:
