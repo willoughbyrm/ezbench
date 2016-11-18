@@ -245,10 +245,11 @@ class ListStats:
         return len(self.data)
 
 class BenchSubTestType(Enum):
-    SUBTEST_FLOAT = 0
-    SUBTEST_STRING = 1
-    SUBTEST_IMAGE = 2
-    METRIC = 3
+    SUBTEST_COMMIT_RESULT = 0
+    SUBTEST_FLOAT = 1
+    SUBTEST_STRING = 2
+    SUBTEST_IMAGE = 3
+    METRIC = 4
 
 class SubTestBase:
     __slots__ = ['name', 'value', 'data_raw_file']
@@ -262,6 +263,16 @@ class SubTestBase:
         self.name = name
         self.value = averageValue
         self.data_raw_file = data_raw_file
+
+class SubTestCommitResult(SubTestBase):
+    def __init__(self, commit):
+        super().__init__("build_result", commit.compil_exit_code, None)
+
+    def subtest_type(self):
+        return BenchSubTestType.SUBTEST_COMMIT_RESULT
+
+    def unit(self):
+        return None
 
 class SubTestString(SubTestBase):
     def __init__(self, name, value, data_raw_file = None):
@@ -381,6 +392,8 @@ class TestRun:
             self.importImgTestRun(runFile)
         elif testType == "unified":
             self.importUnifiedTestRun(runFile)
+        elif testType == "commit_result":
+            self.__add_result__(SubTestCommitResult(testResult.commit))
         else:
             raise ValueError("Ignoring results because the type '{}' is unknown".format(testType))
 
@@ -800,7 +813,9 @@ class TestResult:
         self.__parse_results__(testType, testFile, runFiles, metricsFiles)
 
     def __parse_results__(self, testType, testFile, runFiles, metricsFiles):
-        if testType != "unified":
+        if testType == "commit_result":
+            self.runs.append(TestRun(self, testType, "", []))
+        elif testType != "unified":
             # Read the data and abort if there is no data
             data, unit, self.more_is_better = readCsv(testFile)
             if len(data) == 0:
@@ -1106,6 +1121,13 @@ class Event:
         else:
             return "{}: {}".format(self.commit_range, self.short_desc)
 
+class EventBuildStatusChanged(Event):
+    def __init__(self, commit_range):
+        desc = "status went from {} to {}"
+        desc = desc.format(commit_range.old.compil_exit_code, commit_range.new.compil_exit_code)
+
+        super().__init__("build", commit_range, None, None, 1, desc)
+
 class EventBuildBroken(Event):
     def __init__(self, commit_range):
         super().__init__("build", commit_range, None, None, 1, "build broke")
@@ -1401,6 +1423,10 @@ class Report:
                     testFiles[sha1] = []
                 testFiles[sha1].append((f, m.groups()[1]))
         files_list = None
+
+        # Verify the state of the commits
+        ezbench_runner = Test("ezbench_runner")
+        self.tests.append(ezbench_runner)
 
         # Gather all the information from the commits
         if not silentMode:
