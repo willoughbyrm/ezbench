@@ -110,10 +110,16 @@ def check_commit_variance(actual, measured, max_variance):
 
 def do_stats(data, unit):
 	adata = np.array(data)
-	mean, var, std = stats.bayes_mvs(adata, alpha=0.95)
-	margin = (mean[1][1] - mean[1][0]) / 2 / mean[0]
 	msg = "{:.2f}{}, +/- {:.2f} (std={:.2f}, min={:.2f}{}, max={:.2f}{})"
-	return msg.format(mean[0], unit, margin, std[0], adata.min(), unit, adata.max(), unit)
+	if len(adata) > 1:
+		mean, var, std = stats.bayes_mvs(adata, alpha=0.95)
+		margin = (mean[1][1] - mean[1][0]) / 2 / mean[0]
+		return msg.format(mean[0], unit, margin, std[0], adata.min(), unit, adata.max(), unit)
+	else:
+		mean = 0
+		if len(adata) == 1:
+			mean = adata[0]
+		return msg.format(mean, unit, 0, 0, mean, unit, mean, unit)
 
 def find_event_from_commit(repo, report, type_event, sha1):
 	for e in report.events:
