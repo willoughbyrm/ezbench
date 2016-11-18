@@ -968,6 +968,31 @@ class Commit:
         geom_mean_cache = value
         return value
 
+    def results_set(self):
+        """ Returns the list of results found on this commit"""
+
+        results = set()
+        for result in self.results:
+            for key in result.results():
+                results.add(Test.partial_name(result.test.full_name, [key]))
+        return results
+
+    def result_by_name(self, result):
+        """ Look for $result and return it if available. Return None otherwise."""
+
+        basename, subtests, metrics = Test.parse_name(result)
+        if len(subtests) > 1:
+            raise ValueError("The result name contains more than one result")
+
+        for r in self.results:
+            if r.test.full_name == basename:
+                key = None
+                if len(subtests) > 0:
+                    key = subtests[0]
+                return r.result(key)
+
+        return None
+
 class EventCommitRange:
     def __init__(self, old, new = None):
         self.old = old
