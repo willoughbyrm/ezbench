@@ -702,6 +702,13 @@ class SubTestResult:
             new_results = ListStats(results)
             diff, confidence = old_subtestresult.to_liststat().compare(new_results)
             return new_results.mean(), confidence
+        elif self.value_type == BenchSubTestType.SUBTEST_STRING:
+            # TODO: Try to come up with something a little smarter
+            if (len(self.to_set()) == 1 and len(old_subtestresult.to_set()) == 1 and
+                self.to_list()[0] == old_subtestresult.to_list()[0]):
+                return 0, 0
+            else:
+                return 1, 1
         else:
             return self.to_liststat().compare(old_subtestresult.to_liststat())
 
