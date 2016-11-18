@@ -559,7 +559,7 @@ class TestRun:
 
         """
         if restrict_to_type is None:
-            return self._results.keys()
+            return set(self._results.keys())
         else:
             return set([x for x in self._results if self._results[x].subtest_type() == restrict_to_type])
 
