@@ -11,9 +11,11 @@ function repo_deploy_version() {
     rm -rf $PROFILE_DEPLOY_DIR 2> /dev/null
 
     mkdir $PROFILE_DEPLOY_DIR
-    GIT_DIR="$repoDir/.git" git show $version:perf.py > $PROFILE_DEPLOY_DIR/perf.py || return 72
-    chmod +x $PROFILE_DEPLOY_DIR/perf.py || return 72
+    GIT_DIR="$repoDir/.git" git show $version:perf.py > "$PROFILE_DEPLOY_DIR/perf.py" || return 72
+    chmod +x "$PROFILE_DEPLOY_DIR/perf.py" || return 72
     export PROFILE_DEFAULT_LAST_COMPILED_VERSION=$version
+
+    "$PROFILE_DEPLOY_DIR/perf.py" -b || return 71
 
     return 0
 }
