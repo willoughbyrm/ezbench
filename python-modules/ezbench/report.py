@@ -1124,7 +1124,7 @@ class EventPerfChange(Event):
             raise ValueError("Results should have the same unit (old={}, new={})".format(old_result.unit, new_result.unit))
 
         key = self.old_result.key
-        if len(key) == 0:
+        if key is None or len(key) == 0:
             key = "main value"
 
         msg = "{} went from {:.2f} to {:.2f} {} ({:+.2f}%) with confidence p={:.2f}"
@@ -1151,7 +1151,7 @@ class EventResultNeedsMoreRuns(Event):
         self._wanted_n = wanted_n
 
         key = self.result.key
-        if len(key) == 0:
+        if key is None or len(key) == 0:
             key = "main value"
 
         msg = "{} requires at least {} runs, found {}"
@@ -1168,7 +1168,7 @@ class EventInsufficientSignificance(EventResultNeedsMoreRuns):
         self.wanted_margin = wanted_margin
 
         key = self.result.key
-        if len(key) == 0:
+        if key is None or len(key) == 0:
             key = "main value"
 
         msg = "{} requires more runs to reach the wanted margin ({:.2f}% vs {:.2f}%), proposes n = {}, found {}."
