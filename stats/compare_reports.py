@@ -156,13 +156,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 			db["envs"][test.full_name] = dict()
 
 		for event in report.events:
-			if type(event) is EventBuildBroken:
-				event.commit_range.new.annotation = event.commit_range.new.sha1 + ": build broken"
-				event.commit_range.new.annotation_long = str(event)
-			elif type(event) is EventBuildFixed:
-				event.fixed_commit_range.new.annotation = event.fixed_commit_range.new.sha1 + ": build fixed"
-				event.fixed_commit_range.new.annotation_long = str(event)
-			elif type(event) is EventPerfChange:
+			if type(event) is EventPerfChange:
 				for result in event.commit_range.new.results:
 					if result.test.full_name != event.test.full_name:
 						continue
@@ -1069,7 +1063,7 @@ def gen_report(log_folder, restrict_commits):
 		report = sbench.report(restrict_to_commits = restrict_commits)
 	except RuntimeError:
 		report = Report(log_folder, restrict_to_commits = restrict_commits)
-		report.enhance_report([])
+		report.enhance_report(NoRepo(log_folder))
 
 	return report
 

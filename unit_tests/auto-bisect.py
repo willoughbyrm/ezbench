@@ -108,8 +108,10 @@ if not args.reuse_data:
 
 # List the events
 max_variance = 0.025
-report = create_report(initial_commit.hex[0:7],
-                       (repo.revparse_single('HEAD')).hex[0:7], max_variance,
+l = list(repo.walk(repo.revparse_single('HEAD').oid, pygit2.GIT_SORT_REVERSE))
+initial_commit = l[1]
+report = create_report(initial_commit.hex,
+                       (repo.revparse_single('HEAD')).hex, max_variance,
                        args.reuse_data)
 
 # test the variance of every commit

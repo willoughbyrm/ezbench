@@ -87,13 +87,12 @@ def create_report(base_sha1, head_sha1, max_variance = 0.025, reuse_data=True):
 	sbench.set_attribute("schedule_max_commits", 100)
 
 	# Run until all the enhancements are made!
-	git_history = sbench.git_history()
 	while True:
-		sbench.schedule_enhancements(git_history)
+		sbench.schedule_enhancements()
 		if not sbench.run():
 			break
 
-	report = sbench.report(git_history)
+	report = sbench.report()
 
 	if not reuse_data:
 		report_cleanup(report_name)
@@ -133,7 +132,7 @@ def find_event_from_commit(repo, report, type_event, sha1):
 
 		# If the range is one commit, we can easily find the commit by just
 		# comparing strings
-		if e.commit_range.distance() == 1:
+		if e.commit_range.distance() <= 1:
 			if repo.revparse_single(e.commit_range.new.sha1).hex == sha1:
 				return e
 		else:

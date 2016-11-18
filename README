@@ -151,6 +151,7 @@ do exist so you are sure that the work can be executed when the time comes.
  - python3
  - numpy
  - scipy
+ - pygit2
 
 === Examples ===
 

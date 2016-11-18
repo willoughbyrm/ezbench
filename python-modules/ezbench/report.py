@@ -57,6 +57,7 @@ ezbench_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__
 sys.path.append(os.path.join(ezbench_dir, 'timing_DB'))
 
 from ezbench.runner import *
+from ezbench.scm import *
 from timing import *
 
 from ezbench import imgcmp
@@ -886,6 +887,7 @@ class Commit:
 
         self.results = []
         self.geom_mean_cache = -1
+        self.oldness_factor = 0
 
         self.__parse_commit_information__(report)
 
@@ -1034,12 +1036,27 @@ class Commit:
         return None
 
 class EventCommitRange:
-    def __init__(self, old, new = None):
+    def __init__(self, old, new = None, commit_graph = None):
+        """
+        Create a commit range.
+
+        Args:
+            old: the oldest commit (instance of Commit) of the commit range
+            new: the newest commit (instance of Commit) of the commit range or None
+            commit_graph: The graph containing all the commits before old and new
+                          for the wanted results
+
+        Returns:
+            A commit range
+        """
+
         self.old = old
         if new is None:
             self.new = old
         else:
             self.new = new
+
+        self.commit_graph = commit_graph
 
     def is_single_commit(self):
         return self.distance() <= 1
@@ -1052,16 +1069,62 @@ class EventCommitRange:
         else:
             return datetime.min
 
-    def distance(self):
-        if self.old == self.new:
-            return 0
+    def average_oldness_factor(self):
+        """
+        Returns the average oldness factor of the range (between old and new)
+        """
+        if self.old is not None and self.new is not None:
+            return self.old.oldness_factor + (self.new.oldness_factor - self.old.oldness_factor) / 2
         elif self.old is not None:
-            if hasattr(self.old, "git_distance_head") and hasattr(self.new, "git_distance_head"):
-                return self.old.git_distance_head - self.new.git_distance_head
-            else:
-                return -1
+            return self.old.oldness_factor
+        else:
+            return self.new.oldness_factor
+
+    def distance(self):
+        """
+        Returns the number of commits between old and new
+        """
+        if self.commit_graph is not None:
+            return len(self.commit_graph)
+        elif self.old == self.new:
+            return 1
         else:
             return sys.maxsize
+
+    def bisect_point(self, ignore_commits = set()):
+        """
+        Find the most suitable bisecting point in the associated commit graph.
+        Ignore all the commits found as $ignore_commits.
+
+        Args:
+            ignore_commits: commits to ignore, as they do not work (for instance)
+
+        Returns:
+            The commit ID of the most suitable bisecting point, None otherwise
+        """
+        try:
+            return self.bisect_scores(ignore_commits)[0][0]
+        except Exception as e:
+            return None
+
+    def bisect_scores(self, ignore_commits = set()):
+        """
+        Get the most suitable bisecting points in the associated commit graph.
+        Ignore all the commits found as $ignore_commits.
+
+        Args:
+            ignore_commits: commits to ignore, as they do not work (for instance)
+
+        Returns:
+            A list of tuples (commit_id, score), ordered from the most suitable
+            to the least suitable bisecting points.
+        """
+        if self.commit_graph is None:
+            return []
+
+        scores = self.commit_graph.bisecting_scores(self.new.full_sha1)
+        filter(lambda x: x[0] not in ignore_commits, scores)
+        return scores
 
     def __eq__(x, y):
         if x.is_single_commit() and y.is_single_commit():
@@ -1126,62 +1189,6 @@ class EventBuildStatusChanged(Event):
         desc = desc.format(commit_range.old.compil_exit_code, commit_range.new.compil_exit_code)
 
         super().__init__("build", commit_range, None, None, 1, desc)
-
-class EventBuildBroken(Event):
-    def __init__(self, commit_range):
-        super().__init__("build", commit_range, None, None, 1, "build broke")
-
-    def __str__(self):
-        return "{} broke the build".format(self.commit_range)
-
-class EventBuildFixed(Event):
-    def __init__(self, broken_commit_range, fixed_commit_range):
-        self.broken_commit_range = broken_commit_range
-        self.fixed_commit_range = fixed_commit_range
-
-        parenthesis = ""
-        if (not self.broken_commit_range.is_single_commit() or
-            not self.fixed_commit_range.is_single_commit()):
-            parenthesis = "at least "
-        parenthesis += "after "
-
-        # Generate the description
-        time = self.broken_for_time()
-        if time is not None and time != "":
-            parenthesis += time + " and "
-        commits = self.broken_for_commit_count()
-        if commits == -1:
-            commits = "unknown"
-        parenthesis += "{} commits".format(commits)
-
-        main = "Fix build regression introduced by {} fixed"
-        main = main.format(self.broken_commit_range)
-        desc = "{} ({})".format(main, parenthesis)
-
-        super().__init__("build", fixed_commit_range, None, None, 1, desc)
-
-    def broken_for_time(self):
-        if (self.broken_commit_range.new.commit_date > datetime.min and
-            self.fixed_commit_range.old.commit_date > datetime.min):
-            attrs = ['years', 'months', 'days', 'hours', 'minutes', 'seconds']
-            human_readable = lambda delta: ['%d %s' % (getattr(delta, attr),
-                                                       getattr(delta, attr) > 1 and attr or attr[:-1])
-                for attr in attrs if getattr(delta, attr)]
-            res=', '.join(human_readable(relativedelta.relativedelta(self.fixed_commit_range.old.commit_date,
-                                                                     self.broken_commit_range.new.commit_date)))
-            if len(res) == 0:
-                return "0 seconds"
-            else:
-                return res
-        return None
-
-    def broken_for_commit_count(self):
-        if (hasattr(self.broken_commit_range.new, "git_distance_head") and
-            hasattr(self.fixed_commit_range.new, "git_distance_head")):
-            return (self.broken_commit_range.new.git_distance_head -
-                    self.fixed_commit_range.new.git_distance_head)
-        else:
-            return -1
 
 class EventPerfChange(Event):
     def __init__(self, commit_range, old_result, new_result, confidence):
@@ -1291,6 +1298,20 @@ class EventRenderingChange(Event):
     def diff(self):
         return self.difference
 
+class EventDivergingBaseResult(Event):
+    def __init__(self, result, merge_base):
+        self.result = result
+        self.merge_base = merge_base
+
+        key = self.result.key
+        if key is None or len(key) == 0:
+            key = "main value"
+
+        msg = "{} diverges from at least one other base result, requires testing on the merge base ({})"
+        desc = msg.format(key, merge_base)
+
+        super().__init__("divergence", EventCommitRange(result.commit), result.test, result.key, 1, desc)
+
 class Journal:
     def __init__(self, filepath):
         self._journal = dict()
@@ -1353,6 +1374,8 @@ class Report:
         self.commits = list()
         self.notes = list()
         self.events = list()
+
+        self._cached_walk = dict()
 
         self.__parse_report__(silentMode, restrict_to_commits)
 
@@ -1442,66 +1465,75 @@ class Report:
                 continue
             commit = Commit(self, sha1, full_name, label)
 
-            # Add the commit to the list of commits
-            commit.results = sorted(commit.results, key=lambda res: res.test.full_name)
-            self.commits.append(commit)
-
             # If there are no results, just continue
             if sha1 not in testFiles:
                 continue
 
             # find all the tests
-            handled_tests = set()
-            for testFile, testType in testFiles[sha1]:
-                # Skip on unrelated files
-                if "." in testFile:
-                    continue
+            if sha1 in testFiles:
+                handled_tests = set()
+                for testFile, testType in testFiles[sha1]:
+                    # Skip on unrelated files
+                    if "." in testFile:
+                        continue
 
-                # Skip when the file is a run file (finishes by #XX)
-                if testType != "unified" and re.search(r'#\d+$', testFile) is not None:
-                    continue
+                    # Skip when the file is a run file (finishes by #XX)
+                    if testType != "unified" and re.search(r'#\d+$', testFile) is not None:
+                        continue
 
-                # Unified-formated runs should not have the # in their name
-                testFile = testFile.split("#")[0]
-                if testFile not in handled_tests:
-                    handled_tests.add(testFile)
-                else:
-                    continue
+                    # Unified-formated runs should not have the # in their name
+                    testFile = testFile.split("#")[0]
+                    if testFile not in handled_tests:
+                        handled_tests.add(testFile)
+                    else:
+                        continue
 
-                # Get the test name
-                test_name = testFile[len(commit.sha1) + len(testType) + 2:]
+                    # Get the test name
+                    test_name = testFile[len(commit.sha1) + len(testType) + 2:]
 
-                # Find the right Test or create one if none are found
-                try:
-                    test = next(b for b in self.tests if b.full_name == test_name)
-                except StopIteration:
-                    test = Test(test_name)
-                    self.tests.append(test)
+                    # Find the right Test or create one if none are found
+                    try:
+                        test = next(b for b in self.tests if b.full_name == test_name)
+                    except StopIteration:
+                        test = Test(test_name)
+                        self.tests.append(test)
 
-                # Look for the runs
-                run_re = re.compile(r'^{testFile}#[0-9]+$'.format(testFile=testFile))
-                runsFiles = [f for f,t in testFiles[sha1] if run_re.search(f)]
-                runsFiles.sort(key=lambda x: '{0:0>100}'.format(x).lower()) # Sort the runs in natural order
+                    # Look for the runs
+                    run_re = re.compile(r'^{testFile}#[0-9]+$'.format(testFile=testFile))
+                    runsFiles = [f for f,t in testFiles[sha1] if run_re.search(f)]
+                    runsFiles.sort(key=lambda x: '{0:0>100}'.format(x).lower()) # Sort the runs in natural order
 
-                # Look for metrics!
-                metricsFiles = dict()
-                for runFile in runsFiles:
-                    metricsFiles[runFile] = list()
-                    metrics_re = re.compile(r'^{}.metrics_.+$'.format(runFile))
-                    for metric_file in [f for f,t in testFiles[sha1] if metrics_re.search(f)]:
-                        metricsFiles[runFile].append(metric_file)
+                    # Look for metrics!
+                    metricsFiles = dict()
+                    for runFile in runsFiles:
+                        metricsFiles[runFile] = list()
+                        metrics_re = re.compile(r'^{}.metrics_.+$'.format(runFile))
+                        for metric_file in [f for f,t in testFiles[sha1] if metrics_re.search(f)]:
+                            metricsFiles[runFile].append(metric_file)
 
-                # Create the result object
-                try:
-                    result = TestResult(commit, test, testType, testFile, runsFiles, metricsFiles)
+                    # Create the result object
+                    try:
+                        result = TestResult(commit, test, testType, testFile, runsFiles, metricsFiles)
 
-                    # Add the result to the commit's results
-                    commit.results.append(result)
-                    commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
-                except Exception as e:
-                    traceback.print_exc(file=sys.stderr)
-                    sys.stderr.write("\n")
-                    pass
+                        # Add the result to the commit's results
+                        commit.results.append(result)
+                        commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
+                    except Exception as e:
+                        traceback.print_exc(file=sys.stderr)
+                        sys.stderr.write("\n")
+                        pass
+
+            # Add the information about the runtime
+            result = TestResult(commit, ezbench_runner, "commit_result", None, None, None)
+            commit.results.append(result)
+
+            # Add the information about the runtime and the commit to the list of commits
+            # INFO: Do not add the commit if we got no meaningful results for it
+            if len(commit.results) > 0 or commit.compil_exit_code != EzbenchExitCode.UNKNOWN:
+                result = TestResult(commit, ezbench_runner, "commit_result", None, None, None)
+                commit.results.append(result)
+                commit.results = sorted(commit.results, key=lambda res: res.test.full_name)
+                self.commits.append(commit)
 
         # Go through all the runs and add the missing results
         for commit in self.commits:
@@ -1536,143 +1568,230 @@ class Report:
                 return result
         return None
 
+    def overlay_graphs(self, scm):
+        overlay = ResultsDAG(scm)
 
-    def enhance_report(self, commits_rev_order, max_variance = 0.025,
-                       perf_diff_confidence = 0.99, smallest_perf_change=0.005,
-                       variance_min_run_count = 2):
-        if len(commits_rev_order) > 0:
-            # Get rid of the commits that are not in the commits list
-            to_del = list()
-            for c in range(0, len(self.commits)):
-                if self.commits[c].sha1 not in commits_rev_order:
-                    to_del.append(c)
-            for v in reversed(to_del):
-                print("Pruning the commit {} because it is not in the current history".format(self.commits[v].sha1))
-                del self.commits[v]
+        if len(self.commits) == 1:
+            return overlay
 
-            # Add the index inside the commit
-            for commit in self.commits:
-                commit.git_distance_head = commits_rev_order.index(commit.sha1)
-
-            # Sort the remaining commits
-            self.commits.sort(key=lambda commit: len(commits_rev_order) - commit.git_distance_head)
-
-        # Generate events
-        commit_prev = None
-        test_prev = dict()
-        unittest_prev = dict()
-        build_broken_since = None
+        g = scm.subDAG([c.full_sha1 for c in self.commits])
         for commit in self.commits:
-            commit_range = EventCommitRange(commit_prev, commit)
+            full_sha1 = scm.full_version_name(commit.sha1)
+            overlay.set_results(full_sha1, commit.results_set())
+            g.set_results(full_sha1, commit.results_set())
 
-            # Look for compilation errors
-            if commit.build_broken() and build_broken_since is None:
-                self.events.append(EventBuildBroken(commit_range))
-                build_broken_since = EventCommitRange(commit_prev, commit)
-            elif not commit.build_broken() and build_broken_since is not None:
-                self.events.append(EventBuildFixed(build_broken_since, commit_range))
-                build_broken_since = None
+        for commit in self.commits:
+            # Look for the closest commits from this position and add them to
+            # the overlay
+            w = scm.full_version_name(commit.sha1)
+            graphs_closests = g.find_closest_nodes_with_results(w)
+            for c, r in graphs_closests:
+                overlay.add_edge(w, c, results=r)
 
-            # Look for interesting events
-            for testresult in commit.results:
-                for result_key in testresult.results():
-                    result = testresult.result(result_key)
-                    test = result.subtest_fullname()
-                    test_unit = result.test.unit
+        return overlay
 
-                    if result.value_type == BenchSubTestType.SUBTEST_FLOAT:
+    def __enhance_report_check_variance__(self, variance_cache, result, max_variance):
+        cached_value = variance_cache.get(result, None)
+        if cached_value is not None:
+            return cached_value
 
-                        # Do not care about any metric that is not Joules or Watts
-                        # as they may not have the property of being instantaneous
-                        # and would be un-reproducable
-                        if (result.value_type == BenchSubTestType.METRIC and
-                            result.unit != "W" and result.unit != "J" and
-                            result.unit != "FPS/W"):
-                            continue
+        if result.value_type == BenchSubTestType.SUBTEST_FLOAT:
+            if result.margin() > max_variance:
+                self.events.append(EventInsufficientSignificance(result, max_variance))
+                variance_cache[result] = True
+                return True
+        elif result.value_type == BenchSubTestType.SUBTEST_IMAGE:
+            # FIXME: Need special handling here
+            return False
+        elif result.value_type == BenchSubTestType.SUBTEST_STRING:
+            if len(result.to_set()) > 1:
+                self.events.append(EventUnitResultUnstable(result))
+                variance_cache[result] = True
+                return True
 
-                        if result.margin() > max_variance:
-                            self.events.append(EventInsufficientSignificance(result, max_variance))
+        return False
 
-                        # All the other events require a git history which we do not have, continue...
-                        if len(commits_rev_order) == 0:
-                            continue
+    def __enhance_report_cached_walk__(self, scm, heads, ignores):
+        k = (frozenset(heads), frozenset(ignores))
+        cached = self._cached_walk.get(k, None)
+        if cached == None:
+            cached = scm.walk(heads, ignores)
+            self._cached_walk[k] = cached
 
-                        if test in test_prev:
-                            # We got previous perf results, compare!
-                            old_perf = test_prev[test]
-                            diff, confidence = result.compare(old_perf)
+        return cached
 
-                            # If we are not $perf_diff_confidence sure that this is the
-                            # same normal distribution, say that the performance changed
-                            if confidence >= perf_diff_confidence and diff >= smallest_perf_change:
-                                commit_range = EventCommitRange(test_prev[test].commit, commit)
-                                self.events.append(EventPerfChange(commit_range,
-                                                                old_perf, result,
-                                                                confidence))
-                        test_prev[test] = result
-                    elif result.value_type == BenchSubTestType.SUBTEST_STRING:
-                        subtest_name = result.subtest_fullname()
+    def enhance_report(self, scm, max_variance = 0.025,
+                       min_diff_confidence = 0.99, smallest_perf_change=0.005,
+                       variance_min_run_count = 2):
+        # Find the oldest commit we have
+        now = datetime.now()
+        oldest_commit = now
+        for c in self.commits:
+            if c.commit_date < oldest_commit:
+                oldest_commit = c.commit_date
 
-                        # Verify that all the samples are the same
-                        if len(result.to_set()) > 1:
-                            self.events.append(EventUnitResultUnstable(result))
+        # Compute the oldness factor of all the commits
+        biggest_timedelta = (now - oldest_commit)
+        for c in self.commits:
+            commit_timedelta = now - c.commit_date
+            c.oldness_factor = max(0.1, min(1, commit_timedelta / biggest_timedelta))
 
-                            # Reset the state of the test and continue
-                            unittest_prev[subtest_name] = None
-                            continue
+        # Generate the overlay graph containing every commit with results for
+        # all the results we have.
+        overlay = self.overlay_graphs(scm)
 
-                        # All the other events require a git history, so skip
-                        # them if we do not have it!
-                        if len(commits_rev_order) == 0:
-                            continue
+        # Compute the list of results we have adjacent with our parents in
+        # the overlay graph
+        results = set()
+        for child in overlay.nodes():
+            for parent in overlay.parents(child):
+                results |= overlay.edge_results(parent, child)
 
-                        # Check for differences with the previous commit
-                        # NOTE: unittest_prev and result now can only contain one
-                        # element due to the test above
-                        if subtest_name in unittest_prev:
-                            before = unittest_prev[subtest_name]
-                            if before is not None and before[0] != result[0]:
-                                if len(before) < variance_min_run_count:
-                                    self.events.append(EventResultNeedsMoreRuns(before, variance_min_run_count))
-                                if len(result) < variance_min_run_count:
-                                    self.events.append(EventResultNeedsMoreRuns(result, variance_min_run_count))
-                                if (len(before) >= variance_min_run_count and
-                                    len(result) >= variance_min_run_count):
-                                    commit_range = EventCommitRange(unittest_prev[subtest_name].commit, commit)
-                                    self.events.append(EventUnitResultChange(commit_range,
-                                                                             before,
-                                                                             result))
-
-                        unittest_prev[subtest_name] = result
-                    elif result.value_type == BenchSubTestType.METRIC:
-                        # Do not bisect metrics, it is too early for this
+        # For all results, find what are the changes
+        variance_cache = dict()
+        r = 0
+        for result in results:
+            bottom_leaves = set(overlay.nodes())
+            for child in overlay.nodes():
+                 # Skip if the result is not present on the current node
+                if result not in overlay.results(child):
+                    # Remove the node from the bottom leaves since it does not
+                    # have the result
+                    try:
+                        bottom_leaves.remove(child)
+                    except:
                         pass
-                    elif result.value_type == BenchSubTestType.SUBTEST_IMAGE:
-                        subtest_name = result.subtest_fullname()
+                    continue
 
-                        if len(commits_rev_order) == 0:
-                            continue
+                # Get the commit and results
+                commit_child = self.find_commit_by_id(child)
+                after = commit_child.result_by_name(result)
 
-                        if subtest_name in test_prev:
-                            old_perf = test_prev[subtest_name]
-                            diff, confidence = result.compare(old_perf)
+                # completely ignore metrics for now
+                if after is None or after.value_type == BenchSubTestType.METRIC:
+                    break
 
-                            # TODO: Read minimum difference from configuration file
-                            if confidence >= perf_diff_confidence and diff >= 1.0e-4:
-                                if len(old_perf) < 2:
-                                    self.events.append(EventResultNeedsMoreRuns(old_perf, 2))
-                                if len(result) < 2:
-                                    self.events.append(EventResultNeedsMoreRuns(result, 2))
-                                if len(old_perf) >= 2 and len(result) >= 2:
-                                    commit_range = EventCommitRange(test_prev[subtest_name].commit, commit)
-                                    self.events.append(EventRenderingChange(commit_range,
-                                                                            result, diff,
-                                                                            confidence))
-                        test_prev[subtest_name] = result
+                # Go through all the parents of the child
+                has_one_similar_parent = False
+                has_one_inconclusive_parent = False
+                potential_changes = []
+                parents_for_current_result = set()
+                for parent in overlay.parents(child):
+                    # Skip if the result is not in our overlay graph
+                    if result not in overlay.edge_results(parent, child):
+                        continue
                     else:
-                        print("WARNING: enhance_report: unknown result type {}".format(result.value_type))
+                        # Remove the child from the bottom leaves since we are
+                        # its parent, we are closer to being a bottom leaf
+                        try:
+                            bottom_leaves.remove(child)
+                        except:
+                            pass
 
-            commit_prev = commit
+                    # Add the current parent in the list of parents for this result
+                    parents_for_current_result.add(parent)
+
+                    commit_parent = self.find_commit_by_id(parent)
+                    before = commit_parent.result_by_name(result)
+
+                    # handle build failures
+                    if before.value_type == BenchSubTestType.SUBTEST_COMMIT_RESULT:
+                        if commit_parent.compil_exit_code != commit_child.compil_exit_code:
+                            self.events.append(EventBuildStatusChanged(commit_range))
+
+                    # Generate variance events if necessary
+                    variance_too_high_before = self.__enhance_report_check_variance__(variance_cache, before, max_variance)
+                    variance_too_high_after = self.__enhance_report_check_variance__(variance_cache, after, max_variance)
+
+                    # Compare the two data sets
+                    diff, confidence = after.compare(before)
+                    if confidence >= min_diff_confidence:
+                        if before.value_type == BenchSubTestType.SUBTEST_FLOAT:
+                            if diff >= smallest_perf_change:
+                                potential_changes.append((parent, before, after, diff, confidence))
+                        elif before.value_type == BenchSubTestType.SUBTEST_STRING:
+                            if variance_too_high_before or variance_too_high_after:
+                                has_one_inconclusive_parent = True
+                                continue
+
+                            if len(before) < variance_min_run_count:
+                                self.events.append(EventResultNeedsMoreRuns(before, variance_min_run_count))
+                            if len(after) < variance_min_run_count:
+                                self.events.append(EventResultNeedsMoreRuns(after, variance_min_run_count))
+                            if len(before) >= variance_min_run_count and len(after) >= variance_min_run_count:
+                                potential_changes.append((parent, before, after, diff, confidence))
+                            else:
+                                has_one_inconclusive_parent = True
+                        elif before.value_type == BenchSubTestType.SUBTEST_IMAGE:
+                            # Ignore insignificant changes
+                            if  diff < 1.0e-4:
+                                continue
+                            if len(before) < 2:
+                                self.events.append(EventResultNeedsMoreRuns(before, 2))
+                            if len(after) < 2:
+                                self.events.append(EventResultNeedsMoreRuns(after, 2))
+                            if len(before) >= 2 and len(after) >= 2:
+                                potential_changes.append((parent, before, after, diff, confidence))
+                            else:
+                                has_one_inconclusive_parent = True
+                    else:
+                        # Mark that we have found at least one case where the
+                        # child and the parent have the same results
+                        has_one_similar_parent = True
+
+                # Now that we went through all the parents, we can check what to do
+                # with all the changes
+                if not has_one_similar_parent and not has_one_inconclusive_parent and len(parents_for_current_result) > 0:
+                    commit_graph = self.__enhance_report_cached_walk__(scm, [child], parents_for_current_result)
+
+                    # Create the events
+                    for parent, before, after, diff, confidence in potential_changes:
+                        commit_parent = self.find_commit_by_id(parent)
+                        commit_range = EventCommitRange(commit_parent, commit_child, commit_graph)
+
+                        if before.value_type == BenchSubTestType.SUBTEST_FLOAT:
+                            middle = commit_range.bisect_point()
+                            self.events.append(EventPerfChange(commit_range,
+                                                        before, after,
+                                                        confidence))
+                        elif before.value_type == BenchSubTestType.SUBTEST_STRING:
+                            self.events.append(EventUnitResultChange(commit_range,
+                                                    before,
+                                                    after))
+                        elif before.value_type == BenchSubTestType.SUBTEST_IMAGE:
+                            self.events.append(EventRenderingChange(commit_range,
+                                                                    after, diff,
+                                                                    confidence))
+
+            # Now compare all the bottom leaves to see if they match, if they
+            # don't, then we need to add the merge base for testing!
+            bottoms = set(bottom_leaves)
+            first_bottom = bottoms.pop()
+            first_bottom_result = self.find_commit_by_id(first_bottom).result_by_name(result)
+
+            # completely ignore metrics for now
+            if first_bottom_result is None or first_bottom_result.value_type == BenchSubTestType.METRIC:
+                continue
+
+            diverge = False
+            for bottom in bottoms:
+                bottom_result = self.find_commit_by_id(bottom).result_by_name(result)
+                if bottom_result is None:
+                    continue
+
+                diff, confidence = first_bottom_result.compare(bottom_result)
+                if confidence >= min_diff_confidence:
+                    diverge = True
+                    break
+
+            # We found an actual change,
+            if diverge:
+                merge_base = scm.merge_base(bottom_leaves)
+                for bottom in bottom_leaves:
+                    bottom_result = self.find_commit_by_id(bottom).result_by_name(result)
+                    self.events.append(EventDivergingBaseResult(bottom_result, merge_base))
+
+        return overlay
 
     @classmethod
     def event_tree(cls, reports):
@@ -1680,16 +1799,7 @@ class Report:
         for report in reports:
             r = report.name
 
-            has_history = True
-            for e in report.events:
-                if not hasattr(e.commit_range.old, "git_distance_head"):
-                    has_history = False
-                    break
-
-            if has_history:
-                report.events = sorted(report.events, key=lambda e: e.commit_range.old.git_distance_head)
-            else:
-                report.events = sorted(report.events, key=lambda e: e.commit_range.commit_date(), reverse=True)
+            report.events = sorted(report.events, key=lambda e: e.commit_range.commit_date(), reverse=True)
             for e in report.events:
                 c = e.commit_range
                 if c not in events_tree:

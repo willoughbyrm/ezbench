@@ -440,6 +440,10 @@ class SmartEzbench:
         self.__log(Criticality.II, "Report commit URL has been changed to '{}'".format(commit_url))
 
     def __add_test_unlocked__(self, commit, test, rounds = None):
+        scm = self.repo()
+        if scm is not None:
+            commit = scm.full_version_name(commit)
+
         if commit not in self.state['commits']:
             self.state['commits'][commit] = dict()
             self.state['commits'][commit]["tests"] = dict()
@@ -634,7 +638,7 @@ class SmartEzbench:
         return True
 
     @classmethod
-    def __generate_task_and_events_list__(cls, q, state, log_folder, git_history):
+    def __generate_task_and_events_list__(cls, q, state, log_folder, scm):
         exit_code = 1
         task_tree = list()
         events_str = []
@@ -657,6 +661,7 @@ class SmartEzbench:
 
             # Walk down the report and get rid of every run that has already been made!
             task_tree = copy.deepcopy(state['commits'])
+
             for commit in report.commits:
                 for result in commit.results:
                     for key in result.results():
@@ -713,7 +718,7 @@ class SmartEzbench:
         # in a separate process because python is really bad at freeing memory
         q = multiprocessing.Queue()
         p = multiprocessing.Process(target=SmartEzbench.__generate_task_and_events_list__,
-                                    args=(q, self.state, self.log_folder, self.git_history()))
+                                    args=(q, self.state, self.log_folder, self.repo()))
         p.start()
         exit_code, task_tree, self._events_str = q.get()
         p.join()
@@ -776,6 +781,7 @@ class SmartEzbench:
             if run_info.exit_code.value < 40:
                 # Error we cannot do anything about, probably a setup issue
                 # Let's mark the run as aborted until the user resets it!
+                self.__log(Criticality.EE, "The run returned the error {}".format(run_info.exit_code))
                 self.set_running_mode(RunningMode.ERROR)
             elif (run_info.exit_code == EzbenchExitCode.COMPILATION_FAILED or
                   run_info.exit_code == EzbenchExitCode.DEPLOYMENT_FAILED):
@@ -789,36 +795,29 @@ class SmartEzbench:
 
         return True
 
-    def git_history(self):
-        git_history = list()
+    def repo(self):
+        if not hasattr(self, "_cache_repo_"):
+            # Get the repo directory
+            ezbench = self.__create_ezbench()
+            run_info = ezbench.run(["HEAD"], [], [], dry_run=True)
 
-        # Get the repo directory
-        ezbench = self.__create_ezbench()
-        run_info = ezbench.run(["HEAD"], [], [], dry_run=True)
+            self._cache_repo_ = None
+            if run_info.success() and run_info.repo_dir != '':
+                if run_info.repo_type == "git":
+                    self._cache_repo_ = GitRepo(run_info.repo_dir)
+                    return self._cache_repo_
 
-        if not run_info.success() or run_info.repo_dir == '':
-            return git_history
+            # Default to no-repo
+            self._cache_repo_ = NoRepo(self.log_folder)
 
-        # Get the list of commits and store their position in the list in a dict
-        output = subprocess.check_output(["/usr/bin/git", "log", "--first-parent", "--format=%h %ct"],
-                                          cwd=run_info.repo_dir).decode().split('\n')
+        return self._cache_repo_
 
-        for line in output:
-            fields = line.split(' ')
-            if len(fields) == 2:
-                git_history.append(GitCommit(fields[0], fields[1]))
-
-        return git_history
-
-    def report(self, git_history=list(), reorder_commits = True,
+    def report(self, reorder_commits = True,
                restrict_to_commits = []):
-        if reorder_commits and len(git_history) == 0:
-            git_history = self.git_history()
-
         # Generate the report, order commits based on the git history
         r = Report(self.log_folder, silentMode = True,
                                  restrict_to_commits = restrict_to_commits)
-        r.enhance_report([c.sha1 for c in git_history])
+        r.enhance_report(self.repo())
 
         # Update the list of events with the most up to date report we have
         events_str = []
@@ -828,28 +827,9 @@ class SmartEzbench:
 
         return r
 
-    def __find_middle_commit__(self, git_history, old, new):
-        if not hasattr(self, "__find_middle_commit__cache"):
-            self.__find_middle_commit__cache = dict()
-
-        key = "{}->{}".format(old, new)
-        if key in self.__find_middle_commit__cache:
-            return self.__find_middle_commit__cache[key]
-
-        old_idx = git_history.index(old)
-        new_idx = git_history.index(new)
-        middle_idx = int(old_idx - ((old_idx - new_idx) / 2))
-        if middle_idx != old_idx and middle_idx != new_idx:
-            middle = git_history[middle_idx]
-        else:
-            middle = None
-
-        self.__find_middle_commit__cache[key] = middle
-        return middle
-
     # WARNING: test may be None!
-    def __score_event__(self, git_history, commit_sha1, test, severity):
-        commit_weight = 1 - (git_history.index(commit_sha1) / len(git_history))
+    def __score_event__(self, event_commit_range, commit_sha1, test, severity):
+        commit_weight = 1 - event_commit_range.average_oldness_factor()
 
         test_weight = 1
         if test is not None and hasattr(test, 'score_weight'):
@@ -910,12 +890,15 @@ class SmartEzbench:
         self.__log(Criticality.II, "Start enhancing the report")
 
         # Generate the report, order commits based on the git history
-        if git_history is None:
-            git_history = self.git_history()
-        commits_rev_order = [c.sha1 for c in git_history]
         r = Report(self.log_folder, silentMode = True)
-        r.enhance_report(commits_rev_order, max_variance, perf_diff_confidence,
-                         smallest_perf_change)
+        overlay = r.enhance_report(self.repo(), max_variance, perf_diff_confidence,
+                                   smallest_perf_change)
+
+        # Generate the list of commits to ignore when bisecting
+        ignore_commits = set()
+        for commit in r.commits:
+            if commit.build_broken():
+                ignore_commits.add(commit.full_sha1)
 
         # Check all events
         tasks = []
@@ -926,37 +909,7 @@ class SmartEzbench:
             severity = 0 # should be a value in [0, 1]
             test_name_to_run = ""
             runs = 0
-            if type(e) is EventBuildBroken:
-                if e.commit_range.old is None or e.commit_range.is_single_commit():
-                    continue
-                middle = self.__find_middle_commit__(commits_rev_order,
-                                                     e.commit_range.old.sha1,
-                                                     e.commit_range.new.sha1)
-                if middle is None:
-                    continue
-
-                # Schedule the work
-                commit_sha1 = middle
-                severity = 1
-                event_prio = 0.5
-                test_name_to_run = "no-op"
-                runs = 1
-            elif type(e) is EventBuildFixed:
-                if e.fixed_commit_range.is_single_commit():
-                    continue
-                middle = self.__find_middle_commit__(commits_rev_order,
-                                                     e.fixed_commit_range.old.sha1,
-                                                     e.fixed_commit_range.new.sha1)
-                if middle is None:
-                    continue
-
-                # Schedule the work
-                commit_sha1 = middle
-                severity = 1
-                event_prio = 0.5
-                test_name_to_run = "no-op"
-                runs = 1
-            elif type(e) is EventPerfChange or type(e) is EventRenderingChange:
+            if type(e) is EventPerfChange or type(e) is EventRenderingChange:
                 if e.commit_range.is_single_commit():
                     continue
 
@@ -968,13 +921,9 @@ class SmartEzbench:
                 if result_old.margin() > max_variance:
                     continue
 
-                middle = self.__find_middle_commit__(commits_rev_order,
-                                                     e.commit_range.old.sha1,
-                                                     e.commit_range.new.sha1)
+                middle = e.commit_range.bisect_point(ignore_commits)
                 if middle is None:
                     continue
-
-                # FIXME: handle the case where the middle commit refuses to build
 
                 # Schedule the work
                 commit_sha1 = middle
@@ -1004,9 +953,7 @@ class SmartEzbench:
                     continue
 
                 # Find the middle commit
-                middle = self.__find_middle_commit__(commits_rev_order,
-                                                     e.commit_range.old.sha1,
-                                                     e.commit_range.new.sha1)
+                middle = e.commit_range.bisect_point(ignore_commits)
                 if middle is None:
                     continue
 
@@ -1015,7 +962,14 @@ class SmartEzbench:
                 severity = 1
                 event_prio = 1
                 test_name_to_run = str(e.full_name)
-                runs = np.math.ceil((len(e.old_result) + len(e.new_result)) / 2)
+                runs = min_run_count
+            elif type(e) is EventDivergingBaseResult:
+                # Schedule the work
+                commit_sha1 = e.merge_base
+                severity = 1
+                event_prio = 1
+                test_name_to_run = str(e.full_name)
+                runs = len(e.result)
             elif type(e) is EventUnitResultUnstable:
                 # Nothing to do, for now
                 continue
@@ -1023,7 +977,7 @@ class SmartEzbench:
                 print("schedule_enhancements: unknown event type {}".format(type(e).__name__))
                 continue
 
-            score = self.__score_event__(commits_rev_order, commit_sha1, test, severity)
+            score = self.__score_event__(e.commit_range, commit_sha1, test, severity)
             score *= event_prio
 
             tasks.append((score, commit_sha1, test_name_to_run, runs, e))
