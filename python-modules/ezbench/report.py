@@ -100,7 +100,7 @@ class Test:
     @classmethod
     def partial_name(self, basename, sub_tests):
         name = basename
-        if len(sub_tests) > 0 and len(sub_tests[0]) > 0:
+        if len(sub_tests) > 0 and sub_tests[0] is not None and len(sub_tests[0]) > 0:
             name += "["
             for i in range(0, len(sub_tests)):
                 if i != 0:
