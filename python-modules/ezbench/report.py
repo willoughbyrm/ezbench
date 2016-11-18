@@ -832,7 +832,7 @@ class Commit:
         self.results = []
         self.geom_mean_cache = -1
 
-        self.__parse_commit_information__()
+        self.__parse_commit_information__(report)
 
     def __eq__(x, y):
         if y is None:
@@ -842,7 +842,7 @@ class Commit:
     def __hash__(self):
         return hash(self.sha1)
 
-    def __parse_commit_information__(self):
+    def __parse_commit_information__(self, report):
         self.compile_log = self.sha1 + "_compile_log"
         self.patch = self.sha1 + ".patch"
 
@@ -906,16 +906,23 @@ class Commit:
 
         # Look for the exit code
         self.compil_exit_code = EzbenchExitCode.UNKNOWN
-        try:
-            with open(self.compile_log, 'r') as f:
-                for line in f:
-                    pass
-                # Line contains the last line of the report, parse it
-                if line.startswith("Exiting with error code "):
-                    self.compil_exit_code = EzbenchExitCode(int(line[24:]))
-        except Exception:
-            self.compile_log = None
-            pass
+        if report.journal.deployed_count(self.full_sha1) > 0:
+            self.compil_exit_code = EzbenchExitCode.NO_ERROR
+        elif report.journal.deploy_count(self.full_sha1) > 1:
+            self.compil_exit_code = EzbenchExitCode.DEPLOYMENT_ERROR
+        else:
+            # Last resort, try to inspect the compilation logs
+            try:
+                with open(self.compile_log, 'r') as f:
+                    for line in f:
+                        pass
+                    # Line contains the last line of the report, parse it
+                    s = "Exiting with error code "
+                    if line.startswith(s):
+                        self.compil_exit_code = EzbenchExitCode(int(line[len(s):]))
+            except Exception:
+                self.compile_log = None
+                pass
 
     def build_broken(self):
         return (self.compil_exit_code.value >= EzbenchExitCode.COMP_DEP_UNK_ERROR.value and
@@ -1196,10 +1203,63 @@ class EventRenderingChange(Event):
     def diff(self):
         return self.difference
 
+class Journal:
+    def __init__(self, filepath):
+        self._journal = dict()
+
+        try:
+            with open(filepath, 'r') as f:
+                for entry in f.readlines():
+                    entry = entry.strip()
+                    fields = entry.split(',')
+                    if not fields or len(fields) < 3:
+                        continue
+
+                    # Parse the time
+                    try:
+                        timestamp = float(fields[0])
+                    except:
+                        continue
+
+                    op = fields[1]
+                    key=",".join(fields[2:])
+
+                    self.__add_value__(timestamp, op, key)
+        except Exception:
+            pass
+
+    def __add_value__(self, timestamp, op, key):
+        if op not in self._journal:
+            self._journal[op] = dict()
+        if key not in self._journal[op]:
+            self._journal[op][key] = [timestamp]
+        else:
+            self._journal[op][key].append(timestamp)
+
+    def __key_test__(self, version, test_name):
+        return "{},{}".format(version, test_name)
+
+    def count(self, operation, key):
+        return len(self._journal.get(operation, dict()).get(key, []))
+
+    def deploy_count(self, version):
+        return self.count("deploy", version)
+
+    def deployed_count(self, version):
+        return self.count("deployed", version)
+
+    def test_count(self, version, test_name):
+        return self.count("test", self.__key_test__(version, test_name))
+
+    def tested_count(self, version, test_name):
+        return self.count("tested", self.__key_test__(version, test_name))
+
 class Report:
     def __init__(self, log_folder, silentMode = False, restrict_to_commits = []):
         self.log_folder = log_folder
         self.name = os.path.basename(os.path.abspath(log_folder))
+
+        self.journal = Journal(self.log_folder + "/journal")
 
         self.tests = list()
         self.commits = list()
