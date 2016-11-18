@@ -617,18 +617,19 @@ class SmartEzbench:
 
     @classmethod
     def __remove_task_from_tasktree__(self, task_tree, commit, full_name, rounds):
-        if commit.sha1 not in task_tree:
+        # Verify both that the short and long version names are used
+        if commit not in task_tree:
             return False
-        if full_name not in task_tree[commit.sha1]["tests"]:
+        if full_name not in task_tree[commit]["tests"]:
             return False
 
-        task_tree[commit.sha1]["tests"][full_name]['rounds'] -= rounds
+        task_tree[commit]["tests"][full_name]['rounds'] -= rounds
 
-        if task_tree[commit.sha1]["tests"][full_name]['rounds'] <= 0:
-            del task_tree[commit.sha1]["tests"][full_name]
+        if task_tree[commit]["tests"][full_name]['rounds'] <= 0:
+            del task_tree[commit]["tests"][full_name]
 
-        if len(task_tree[commit.sha1]["tests"]) == 0:
-            del task_tree[commit.sha1]
+        if len(task_tree[commit]["tests"]) == 0:
+            del task_tree[commit]
 
         return True
 
@@ -660,12 +661,17 @@ class SmartEzbench:
                 for result in commit.results:
                     for key in result.results():
                         full_name = Test.partial_name(result.test.full_name, [key])
-                        SmartEzbench.__remove_task_from_tasktree__(task_tree, commit, full_name, len(result.result(key)))
+                        SmartEzbench.__remove_task_from_tasktree__(task_tree, commit.full_sha1, full_name, len(result.result(key)))
+                        # HACK: Remove this when all the new reports use the full_sha1 for storage
+                        SmartEzbench.__remove_task_from_tasktree__(task_tree, commit.sha1, full_name, len(result.result(key)))
 
             # Delete the tests on commits that do not compile
             for commit in report.commits:
-                if commit.build_broken() and commit.sha1 in task_tree:
-                    del task_tree[commit.sha1]
+                if commit.build_broken():
+                    if commit.full_sha1 in task_tree:
+                        del task_tree[commit.full_sha1]
+                    elif commit.sha1 in task_tree:
+                        del task_tree[commit.sha1]
 
             exit_code = 0
         except Exception as e:
