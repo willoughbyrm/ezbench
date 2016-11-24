@@ -511,7 +511,7 @@ for (( t=0; t<${#testsList[@]}; t++ )); do
             fi
             unset last_result
 
-            time=$("$ezBenchDir/timing_DB/timing.py" -n benchmark -k "${availTestNames[$a]}" -r median 2> /dev/null)
+            time=$("$ezBenchDir/timing_DB/timing.py" -n test -k "${availTestNames[$a]}" -r median 2> /dev/null)
             if [ -n "$time" ] && [[ "$time" != "-1" ]]; then
                 availTestExecTime[$a]=$time
             fi
