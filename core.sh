@@ -169,6 +169,40 @@ function callIfDefined() {
     fi
 }
 
+function write_to_journal {
+    local journal="$logsFolder/journal"
+    local operation=$1
+    local key=$2
+    shift 2
+
+    [ -d "$logsFolder" ] || return
+
+    local time=$(date +"%s.%6N")
+
+    # if the operation is "deployed", check how long it took to deploy
+    if [[ "$operation" == "deployed" ]]; then
+        local deploy_time=$(tail -n 1 "$logsFolder/journal" 2> /dev/null | awk -F ',' "{    \
+            if (\$2 == \"deploy\" && \$3 == \"$key\") {                          \
+                print $time - \$1                                              \
+            }                                                                  \
+        }")
+
+        if [ -n "$deploy_time" ]; then
+            "$ezBenchDir/timing_DB/timing.py" -n deploy -k "$profile" -a "$deploy_time"
+        fi
+    fi
+
+    echo -n "$time,$operation,$key" >> "$journal" 2> /dev/null
+
+    while [ "${1+defined}" ]; do
+        echo -n ",$1" >> "$journal" 2> /dev/null
+        shift
+    done
+    echo "" >> "$journal" 2> /dev/null
+
+    sync
+}
+
 function show_help {
     echo "    core.sh [list of SHA1]"
     echo ""
@@ -353,10 +387,18 @@ echo "Configuration scripts used: $conf_scripts"
 profile_repo_check
 display_repo_info
 
+# Generate the logs folder path
+logsFolder="$ezBenchDir/logs/${reportName:-$(date +"%Y-%m-%d-%T")}"
+
+# Write in the journal that the version is deployed (even in dry-run mode)
+deployed_version=$(profile_repo_version_from_human $(profile_repo_deployed_version))
+if [ -n "$deployed_version" ]; then
+    write_to_journal deployed $deployed_version
+fi
+
 # redirect the output to both a log file and stdout
 if [ -z "$dry_run" ]
 then
-    logsFolder="$ezBenchDir/logs/${reportName:-$(date +"%Y-%m-%d-%T")}"
     [ -d $logsFolder ] || mkdir -p $logsFolder || exit 30
     exec > >(tee -a $logsFolder/results)
     exec 2>&1
@@ -543,28 +585,11 @@ bad_color=$c_bright_red
 good_color=$c_bright_green
 meh_color=$c_bright_yellow
 
-function write_to_journal {
-    local journal="$logsFolder/journal"
-    local operation=$1
-    local key=$2
-    shift 2
-
-    time=$(date +"%s.%6N")
-    echo -n "$time,$operation,$key" >> "$journal"
-
-    while [ "${1+defined}" ]; do
-        echo -n ",$1" >> "$journal"
-        shift
-    done
-    echo "" >> "$journal"
-
-    sync
-}
-
 function compile_and_deploy {
     # Accessible variables
-    # $version     [RO]: SHA1 id of the current version
-    # $versionName [RO]: Name of the version
+    # $version      [RO]: SHA1 id of the current version
+    # $version_full [RO]: Full SHA1 id of the current version
+    # $versionName  [RO]: Name of the version
 
     profile_repo_get_patch $version > "$logsFolder/$1.patch"
 
@@ -582,13 +607,14 @@ function compile_and_deploy {
 
     compile_logs=$logsFolder/${version}_compile_log
 
-    write_to_journal deploy $version_full
-
     # Compile the version and check for failure. If it failed, go to the next version.
     export REPO_COMPILE_AND_DEPLOY_VERSION=$version
     eval "$makeAndDeployCmd" >> "$compile_logs" 2>&1
     local exit_code=$?
     unset REPO_COMPILE_AND_DEPLOY_VERSION
+
+    # Add to the log that we are now in the deployment phase
+    write_to_journal deploy $version_full
 
     # The exit code 74 actually means everything is fine but we need to reboot
     if [ $exit_code -eq 74 ]
@@ -658,6 +684,8 @@ do
 
     # compile and deploy the version
     compile_and_deploy $version
+
+    # Write in the journal that the version is deployed
     write_to_journal deployed $version_full
 
     # Iterate through the tests
