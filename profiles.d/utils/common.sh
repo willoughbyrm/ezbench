@@ -72,7 +72,7 @@ function xserver_setup_start() {
     [[ $dry_run -eq 1 ]] && return 1
 
     # Early exit if the server is already running
-    [[ -n "$EZBENCH_X_PID" ]] && return 0
+    [[ -n "$EZBENCH_X_PID" ]] && ps -p "$EZBENCH_X_PID" > /dev/null 2> /dev/null && return 0
 
     # Check for dependencies
     has_automatic_sudo_rights || return 1
@@ -147,7 +147,7 @@ function gui_start() {
     # Start the compositor
     if [ -n "$EZBENCH_CONF_COMPOSITOR" ]; then
         # Early exit if the compositor is already running
-        [[ -n "$EZBENCH_COMPOSITOR_PID" ]] && return 0
+        [[ -n "$EZBENCH_COMPOSITOR_PID" ]] && ps -p "$EZBENCH_CONF_COMPOSITOR" > /dev/null 2> /dev/null && return 0
 
         has_binary "${EZBENCH_CONF_COMPOSITOR}" || return 1
         has_binary "unbuffer" || return 1
