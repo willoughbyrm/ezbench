@@ -341,6 +341,11 @@ class SubTestImage(SubTestBase):
 class TestRun:
     __slots__ = ['test_result', 'run_file', 'main_value_type', 'main_value', 'env_file', '_results']
 
+    # Holds the different subresults for all the tests to allow detecting the
+    # missing results
+    subresults = dict()
+    subresults_type = dict()
+
     def __init__(self, testResult, testType, runFile, metricsFiles, mainValueType = None, mainValue = None):
         self.test_result = testResult
         self.run_file = runFile
@@ -422,6 +427,14 @@ class TestRun:
         else:
             key = subtest.name
 
+        # Add the key to the subresults
+        test_name = self.test_result.test.full_name
+        if test_name not in TestRun.subresults:
+            TestRun.subresults[test_name] = set()
+            TestRun.subresults_type[test_name] = dict()
+        TestRun.subresults[test_name].add(key)
+        TestRun.subresults_type[test_name][key] = subtest.__class__.__name__
+
         # Verify that the subtest does not already exist
         if key in self._results:
             msg = "Raw data file '{}' tries to add an already-existing result '{}' (found in '{}')"
@@ -429,6 +442,22 @@ class TestRun:
             raise ValueError(msg)
 
         self._results[key] = subtest
+
+    def tag_missing_results(self):
+        # Verify that the TestRun was a complete run
+        if self.result("") is None:
+            return
+
+        # Find the keys that are not present
+        test_name = self.test_result.test.full_name
+        for key in TestRun.subresults[test_name] - self.results():
+            t = TestRun.subresults_type[test_name][key]
+            if t == "SubTestFloat":
+                self.__add_result__(SubTestFloat(key, self.test_result.unit, -1, self.run_file))
+            elif t == "SubTestString":
+                self.__add_result__(SubTestString(key, "missing", self.run_file))
+            elif t == "SubTestImage":
+                self.__add_result__(SubTestImage(key, None, self.run_file))
 
     def __add_metrics__(self, metric_file):
         values = dict()
@@ -1451,6 +1480,12 @@ class Report:
                     traceback.print_exc(file=sys.stderr)
                     sys.stderr.write("\n")
                     pass
+
+        # Go through all the runs and add the missing results
+        for commit in self.commits:
+            for result in commit.results:
+                for run in result.runs:
+                    run.tag_missing_results()
 
         # Sort the list of tests
         self.tests = sorted(self.tests, key=lambda test: test.full_name)
