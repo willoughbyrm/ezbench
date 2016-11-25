@@ -64,6 +64,10 @@ parser.add_argument("-r", dest='rounds', help="Number of execution rounds",
                     action="store", type=int, nargs='?')
 parser.add_argument("-p", dest='profile', help="Profile to be used by ezbench",
                     action="store")
+parser.add_argument("-s", dest='add_conf_script', help="Add a configuration script for EzBench's runner",
+                    action="append")
+parser.add_argument("-S", dest='remove_conf_script', help="Remove a configuration script for EzBench's runner",
+                    action="append")
 parser.add_argument("report_name", nargs='?')
 parser.add_argument("command", help="Command to execute", nargs='?',
                     choices=('start', 'run', 'pause', 'abort', 'status'))
@@ -116,6 +120,14 @@ sbench = SmartEzbench(ezbench_dir, args.report_name)
 
 if sbench.profile() is None and args.profile is not None:
     sbench.set_profile(args.profile)
+
+if args.add_conf_script is not None:
+    for add in args.add_conf_script:
+        sbench.add_conf_script(add)
+
+if args.remove_conf_script is not None:
+    for add in args.remove_conf_script:
+        sbench.remove_conf_script(add)
 
 # add commits and tests
 if args.commits is not None and args.tests is not None:

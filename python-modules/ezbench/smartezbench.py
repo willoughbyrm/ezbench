@@ -203,7 +203,7 @@ class SmartEzbench:
     def __log(self, error, msg):
         time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log_msg = "{time}: ({error}) {msg}\n".format(time=time, error=error.name, msg=msg)
-        if error.value >= self.min_criticality.value:
+        if error.value <= self.min_criticality.value:
             print(log_msg, end="")
             if not self.readonly:
                 self.log_file.write(log_msg)
@@ -274,7 +274,8 @@ class SmartEzbench:
             profile = self.profile()
 
         return Ezbench(ezbench_dir = self.ezbench_dir, profile = profile,
-                       report_name = self.report_name)
+                       report_name = self.report_name,
+                       run_config_scripts = self.conf_scripts())
 
     def __read_attribute_unlocked__(self, attr, default = None):
         if attr in self.state:
@@ -357,21 +358,36 @@ class SmartEzbench:
             self.__log(Criticality.EE, "You cannot change the profile of a report that already has results. Start a new one.")
         self.__release_lock()
 
-    def conf_script(self):
-        self.__reload_state(keep_lock=True)
-        if "conf_script" in self.state:
-            conf_script = self.state['conf_script']
-            self.__release_lock()
-            return conf_script
-        else:
-            self.__release_lock()
-            return None
+    def conf_scripts(self):
+        return self.__read_attribute__('conf_scripts', [])
 
-    def set_conf_script(self, conf_script):
-        if self.__write_attribute__('conf_script', conf_script, allow_updates = False):
-            self.__log(Criticality.II, "Ezbench profile configuration script set to '{0}'".format(conf_script))
+    def add_conf_script(self, conf_script):
+        self.__reload_state(keep_lock=True)
+        if 'beenRunBefore' not in self.state or self.state['beenRunBefore'] == False:
+            if "conf_scripts" not in self.state:
+                self.state['conf_scripts'] = list()
+
+            if conf_script not in self.state['conf_scripts']:
+                self.__log(Criticality.II, "Add configuration script '{0}'".format(conf_script))
+                self.state['conf_scripts'].append(conf_script)
+                self.__save_state()
         else:
-            self.__log(Criticality.EE, "You cannot change the configuration script of a report that already has results. Start a new one.")
+             self.__log(Criticality.EE, "You cannot change the set of scripts of a report that already has results. Start a new one.")
+        self.__release_lock()
+
+    def remove_conf_script(self, conf_script):
+        self.__reload_state(keep_lock=True)
+        if 'beenRunBefore' not in self.state or self.state['beenRunBefore'] == False:
+            if "conf_scripts" in self.state:
+                try:
+                    self.state['conf_scripts'].remove(conf_script)
+                    self.__log(Criticality.II, "Remove configuration script '{0}'".format(conf_script))
+                    self.__save_state()
+                except:
+                    pass
+        else:
+             self.__log(Criticality.EE, "You cannot change the set of scripts of a report that already has results. Start a new one.")
+        self.__release_lock()
 
     def commit_url(self):
         return self.__read_attribute__('commit_url')
@@ -626,6 +642,8 @@ class SmartEzbench:
         else:
             profile = self.state["profile"]
             self.__log(Criticality.II, "    - Ezbench profile: '{0}'".format(profile))
+
+        self.__log(Criticality.II, "    - Configuration scripts: '{0}'".format(self.conf_scripts()))
 
         # Create the ezbench runner
         ezbench = self.__create_ezbench()
