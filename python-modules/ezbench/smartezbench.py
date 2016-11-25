@@ -705,7 +705,8 @@ class SmartEzbench:
         # Create the ezbench runner
         ezbench = self.__create_ezbench()
         run_info = ezbench.run(["HEAD"], [], [], dry_run=True)
-        self.__log(Criticality.II, "    - Deployed version: '{0}'".format(run_info.deployed_commit))
+        deployed_commit = self.repo().full_version_name(run_info.deployed_commit)
+        self.__log(Criticality.II, "    - Deployed version: '{0}'".format(deployed_commit))
         self.__log(Criticality.II, "All the dependencies are met, generate a report...")
 
         # Generate a report to compare the goal with the current state. Run it
@@ -729,7 +730,7 @@ class SmartEzbench:
 
         # Prioritize --> return a list of commits to do in order
         self._task_lock.acquire()
-        self._task_list = self.__prioritize_runs(task_tree, run_info.deployed_commit)
+        self._task_list = self.__prioritize_runs(task_tree, deployed_commit)
 
         # Call the hook file, telling we started running
         self.__call_hook__('start_running_tests')
