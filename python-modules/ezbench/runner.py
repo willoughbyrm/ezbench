@@ -73,7 +73,7 @@ class EzbenchRun:
 class Ezbench:
     def __init__(self, ezbench_dir, profile = None, repo_path = None,
                  make_command = None, report_name = None, tests_folder = None,
-                 run_config_script = None):
+                 run_config_scripts = []):
         self.ezbench_dir = ezbench_dir
         self.ezbench_path = "{}/core.sh".format(ezbench_dir)
         self.profile = profile
@@ -81,7 +81,7 @@ class Ezbench:
         self.make_command = make_command
         self.report_name = report_name
         self.tests_folder = tests_folder
-        self.run_config_script = run_config_script
+        self.run_config_scripts = run_config_scripts
 
         self.abortFileName = None
         if report_name is not None:
@@ -131,8 +131,8 @@ class Ezbench:
             ezbench_cmd.append("-N"); ezbench_cmd.append(self.report_name)
         if self.tests_folder is not None:
             ezbench_cmd.append("-T"); ezbench_cmd.append(self.tests_folder)
-        if self.run_config_script is not None:
-            ezbench_cmd.append("-c"); ezbench_cmd.append(self.run_config_script)
+        for script in self.run_config_scripts:
+            ezbench_cmd.append("-c"); ezbench_cmd.append(script)
 
         if dry_run:
             ezbench_cmd.append("-k")
