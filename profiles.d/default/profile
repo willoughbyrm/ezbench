@@ -29,6 +29,7 @@ function __default_make_and_deploy__() {
     callIfDefined compile_pre_hook
 
     make -j8 || return 71
+    callIfDefined deploy_pre_hook
     make_install_sha1_dump || return 72
     export PROFILE_DEFAULT_LAST_COMPILED_VERSION=$version
 

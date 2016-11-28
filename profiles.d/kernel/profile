@@ -89,6 +89,20 @@ function repo_compile_version() {
     return 0
 }
 
+function __kernel_deploy__() {
+    # Copy the initramfs and kernel over!
+    sudo -n cp "$(profile_repo_deployment_version_dir)"/boot/* /boot/ || return 72
+
+    # Force grub to boot on the non-distro kernel that we just compiled
+    #
+    # WARNING: Make sure that grub reverts to the distro's kernel if the
+    # computer crashes!
+    sudo -n grub-reboot ezbench_kernel || return 72
+
+    # Ask core.sh to reboot
+    return 74
+}
+
 function __default_make_and_deploy__() {
     # Return error codes:
     # 71: Compilation error
@@ -108,9 +122,6 @@ function __default_make_and_deploy__() {
 
         repo_compile_version
         compile_error=$?
-
-        # Call the user-defined post-compile hook
-        callIfDefined compile_post_hook
 
         profile_repo_compile_stop
 
@@ -134,17 +145,16 @@ function __default_make_and_deploy__() {
         echo "$(date +"%m-%d-%Y-%T"): Found a cached version of the compilation, re-use it!"
     fi
 
-    # Copy the initramfs and kernel over!
-    sudo -n cp "$(profile_repo_deployment_version_dir)"/boot/* /boot/ || return 72
+    # Deploy the kernel
+    callIfDefined ezbench_deploy_pre_hook
+    __kernel_deploy__
+    local deploy_exitcode=$?
 
-    # Force grub to boot on the non-distro kernel that we just compiled
-    #
-    # WARNING: Make sure that grub reverts to the distro's kernel if the
-    # computer crashes!
-    sudo -n grub-reboot ezbench_kernel || return 72
+    # Call the user-defined post-compile hook
+    callIfDefined compile_post_hook
 
     # Return that a reboot is necessary
-    return 74
+    return $deploy_exitcode
 }
 
 # MANDATORY: Print the currently-deployed version of the repo

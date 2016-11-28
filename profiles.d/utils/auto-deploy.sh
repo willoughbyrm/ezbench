@@ -34,9 +34,12 @@ function profile_repo_deployment_version_dir() {
 # Outputs:
 #   - All the environment variables set to work as expected
 function repo_deploy_version() {
-    rm $PROFILE_DEPLOY_DIR 2> /dev/null
-
     local dep_version_dir=$(profile_repo_deployment_version_dir)
+    [ -d "$dep_version_dir" ] || return 72
+
+    callIfDefined ezbench_deploy_pre_hook
+
+    rm $PROFILE_DEPLOY_DIR 2> /dev/null
     ln -s $dep_version_dir $PROFILE_DEPLOY_DIR || return 72
 
     return 0
@@ -53,6 +56,9 @@ function auto_deploy_make_and_deploy() {
         return 72
     fi
 
+    # Call the user-defined pre-compile hook
+    callIfDefined compile_pre_hook
+
     # First, check if we already have compiled the wanted version
     repo_deploy_version
     local depl_version=$(profile_repo_deployed_version)
@@ -67,35 +73,35 @@ function auto_deploy_make_and_deploy() {
         local exit_code=$?
         [ $exit_code -ne 0 ] && return $exit_code
 
-        # Call the user-defined pre-compile hook
-        callIfDefined compile_pre_hook
-
         repo_compile_version
         local compile_error=$?
 
-        # Call the user-defined post-compile hook
-        callIfDefined compile_post_hook
-
         profile_repo_compile_stop
-        local exit_code=$?
-        [ $exit_code -ne 0 ] && return $exit_code
 
-        # compute the compilation time
-        local compile_end=$(date +%s)
-        local build_time=$(($compile_end-$compile_start))
-        echo "$(date +"%m-%d-%Y-%T"): Done compiling version $version (exit code=$compile_error). Build time = $build_time."
+        if [[ $compile_error -eq 0 || $compile_error -eq 74 ]]; then
+            # compute the compilation time
+            local compile_end=$(date +%s)
+            local build_time=$(($compile_end-$compile_start))
+            echo "$(date +"%m-%d-%Y-%T"): Done compiling version $version (exit code=$compile_error). Build time = $build_time."
 
-        # Update our build time estimator
-        "$ezBenchDir/timing_DB/timing.py" -n build -k "$profile" -a $build_time
-        local avgBuildTime=$(profile_repo_compilation_time)
-        local avgBuildTime=$(bc <<< "0.75*$avgBuildTime + 0.25*$build_time")
-        profile_repo_set_compilation_time $avgBuildTime
+            # Update our build time estimator
+            "$ezBenchDir/timing_DB/timing.py" -n build -k "$profile" -a $build_time
+            local avgBuildTime=$(profile_repo_compilation_time)
+            local avgBuildTime=$(bc <<< "0.75*$avgBuildTime + 0.25*$build_time")
+            profile_repo_set_compilation_time $avgBuildTime
 
-        # Now deploy the version that we compiled
-        repo_deploy_version
+            # Call the user-defined post-compile hook
+            callIfDefined deploy_pre_hook
+
+            # Now deploy the version that we compiled
+            repo_deploy_version
+        fi
     else
         echo "$(date +"%m-%d-%Y-%T"): Found a cached version of the compilation, re-use it!"
     fi
+
+    # Call the user-defined post-compile hook
+    callIfDefined compile_post_hook
 
     return $compile_error
 }
