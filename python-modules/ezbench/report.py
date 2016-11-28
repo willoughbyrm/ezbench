@@ -865,22 +865,23 @@ class Commit:
                 basefdourl = "https://bugs.freedesktop.org/show_bug.cgi?id="
                 for line in f:
                     line = line.strip()
-                    if line == "---": # Detect the end of the header
-                        break
-                    elif line.startswith('commit'):
-                        self.full_sha1 = line.split(' ')[1]
-                    elif line.startswith('Author:'):
-                        self.author = line[12:]
-                    elif line.startswith('AuthorDate: '):
-                        self.author_date = datetime.fromtimestamp(mktime_tz(parsedate_tz(line[12:])))
-                    elif line.startswith('Commit:'):
-                        self.commiter = line[12:]
-                    elif line.startswith('CommitDate: '):
-                        self.commit_date = datetime.fromtimestamp(mktime_tz(parsedate_tz(line[12:])))
-                    elif line == '':
-                        # The commit log is about to start
-                        log_started = True
-                    elif log_started:
+                    if not log_started:
+                        if line == "---": # Detect the end of the header
+                            break
+                        elif line.startswith('commit'):
+                            self.full_sha1 = line.split(' ')[1]
+                        elif line.startswith('Author:'):
+                            self.author = line[12:]
+                        elif line.startswith('AuthorDate: '):
+                            self.author_date = datetime.fromtimestamp(mktime_tz(parsedate_tz(line[12:])))
+                        elif line.startswith('Commit:'):
+                            self.commiter = line[12:]
+                        elif line.startswith('CommitDate: '):
+                            self.commit_date = datetime.fromtimestamp(mktime_tz(parsedate_tz(line[12:])))
+                        elif line == '':
+                            # The commit log is about to start
+                            log_started = True
+                    else:
                         if self.title == '':
                             self.title = line
                         else:
