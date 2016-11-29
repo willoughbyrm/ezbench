@@ -67,14 +67,24 @@ function profile_repo_type() {
 # Inputs:
 #   - $repoDir
 function profile_repo_version_to_human() {
-   GIT_DIR="$repoDir/.git" git show --format="%h %s" -s "$1"
+    GIT_DIR="$repoDir/.git" git show --format="%h %s" -s "$1" 2> /dev/null
+    local ret=$?
+    if [ $ret -ne 0 ]; then
+        echo $ret
+        return $ret
+    fi
 }
 
 # MANDATORY: Print the full name of the version
 # Inputs:
 #   - $repoDir
 function profile_repo_version_from_human() {
-   GIT_DIR="$repoDir/.git" git rev-parse "$1"
+    GIT_DIR="$repoDir/.git" git rev-parse "$1" 2> /dev/null
+    local ret=$?
+    if [ $ret -ne 0 ]; then
+        echo $ret
+        return $ret
+    fi
 }
 
 # Print on stdout the patch for the version id given as a parameter
