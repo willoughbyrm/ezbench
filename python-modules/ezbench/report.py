@@ -762,6 +762,8 @@ class TestResult:
         self.more_is_better = True
         self.unit = None
 
+        self._results_cache = dict()
+
         self.__parse_results__(testType, testFile, runFiles, metricsFiles)
 
     def __parse_results__(self, testType, testFile, runFiles, metricsFiles):
@@ -800,10 +802,16 @@ class TestResult:
 
     def result(self, key = None):
         """ Returns the result associated to the key or None if it does not exist """
+        cached_result = self._results_cache.get(key, None)
+        if cached_result is not None:
+            return cached_result
 
         if len(self.runs) == 0:
             raise ValueError('Cannot get the results when there are no runs ({})'.format(self.test_file))
-        return SubTestResult(self, self.test, key, self.runs)
+        result = SubTestResult(self, self.test, key, self.runs)
+        self._results_cache[key] = result
+
+        return result
 
     def results(self, restrict_to_type = None):
         """
