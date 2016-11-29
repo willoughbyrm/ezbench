@@ -577,7 +577,6 @@ class SmartEzbench:
             # Generate the report, order commits based on the git history
             try:
                 report = Report(log_folder, silentMode = True)
-                report.enhance_report([c.sha1 for c in git_history])
             except Exception as e:
                 traceback.print_exc(file=sys.stderr)
                 sys.stderr.write("\n")
