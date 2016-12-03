@@ -67,6 +67,7 @@ class RunningMode(Enum):
     PAUSE = 2
     ERROR = 3
     ABORT = 4
+    DONE = 5
 
     # Intermediate steps, going from RUN to RUNNING or RUNNING to PAUSE/ABORT
     INTERMEDIATE = 100
@@ -314,13 +315,7 @@ class SmartEzbench:
         self.__release_lock()
         return ret
 
-    def set_running_mode(self, mode):
-        if mode.value >= RunningMode.INTERMEDIATE.value:
-            self.__log(Criticality.EE, "Ezbench mode cannot manually be set to '{}'".format(mode.name))
-            return False
-
-        self.__reload_state(keep_lock=True)
-
+    def __set_running_mode_unlocked__(self, mode):
         # Request an early exit if we go from RUNNING to PAUSE or
         cur_mode = self.__running_mode_unlocked__()
         if cur_mode.value > RunningMode.INTERMEDIATE.value and mode != RunningMode.RUN:
@@ -328,6 +323,14 @@ class SmartEzbench:
 
         self.__write_attribute_unlocked__('mode', mode.value, allow_updates = True)
         self.__log(Criticality.II, "Ezbench running mode set to '{mode}'".format(mode=mode.name))
+
+    def set_running_mode(self, mode):
+        if mode.value >= RunningMode.INTERMEDIATE.value:
+            self.__log(Criticality.EE, "Ezbench mode cannot manually be set to '{}'".format(mode.name))
+            return False
+
+        self.__reload_state(keep_lock=True)
+        self.__set_running_mode_unlocked__(mode)
         self.__release_lock()
 
         return True
@@ -419,6 +422,10 @@ class SmartEzbench:
         # Delete a commit that has no test
         if len(self.state['commits'][commit]['tests']) == 0:
             del self.state['commits'][commit]
+
+        # If the state was DONE, set it back to RUN
+        if self.__running_mode_unlocked__(check_running=False) == RunningMode.DONE:
+            self.__set_running_mode_unlocked__(RunningMode.RUN)
 
     def add_test(self, commit, test, rounds = None):
         self.__reload_state(keep_lock=True)
@@ -943,5 +950,10 @@ class SmartEzbench:
         self.__release_lock()
 
         self.__log(Criticality.II, "Done enhancing the report")
+
+
+        if (added == 0 and
+            self.__running_mode_unlocked__(check_running=False) == RunningMode.RUN):
+            self.set_running_mode(RunningMode.DONE)
 
         return r
