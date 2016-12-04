@@ -311,6 +311,7 @@ def reload_conf_handler(signum, frame):
 parser = argparse.ArgumentParser()
 parser.add_argument("--embed", action="store_true")
 parser.add_argument("--http_server", help="Generate an HTTP interface to show the status of the reports. Format: listen_ip:port")
+parser.add_argument("--hook", help="Path to the binary to call when certain events happen.")
 args = parser.parse_args()
 
 # Set up the http server
@@ -348,7 +349,7 @@ while not stop_requested:
     for report_name in reports:
         try:
             if report_name not in sbenches:
-                sbench = SmartEzbench(ezbench_dir, report_name)
+                sbench = SmartEzbench(ezbench_dir, report_name, hook_binary_path=args.hook)
                 sbenches[report_name] = sbench
             else:
                 sbench = sbenches[report_name]

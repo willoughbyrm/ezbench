@@ -295,6 +295,36 @@ using ezbench's CLI interface.
 			./ezbench -t gl_render -c HEAD -p mesa mesa_nightly run
 	fi
 
+
+=== Hooks ===
+
+Just like for core.sh, you may also want to hook into the logic of ezbenchd. To
+do so, you will need to write a program/script and give its path to ezbenchd
+with the --hook option.
+
+The program will receive the following variables in its environment:
+
+    - action: Action that triggered the hook
+        - start_running_tests: Smartezbench is about to run some tests
+        - mode_changed: The mode of the report has changed
+        - done_running_tests: Smartezbench is done running tests
+    - ezbench_dir: Directory containing ezbench
+    - ezbench_report_name: Name of the report currently being used
+    - ezbench_report_path: Path to the folder containing the current report
+    - ezbench_report_mode: Current mode of the report
+    - ezbench_report_mode_prev: Previous value of the mode, only set if
+                                action == mode_changed.
+
+As an example, you could have the following hook script to print a message
+whenever a mode change happens:
+
+	import os
+	if os.environ['action'] == "mode_changed":
+		s = "{}: Mode changed from {} to {}"
+		print(s.format(os.environ['ezbench_report_name'],
+		               os.environ['ezbench_report_mode_prev'],
+		               os.environ['ezbench_report_mode']))
+
 == stats/gen_report.py ==
 
 WARNING: This tool is deprecated, compare_reports.py is the prefered way now even

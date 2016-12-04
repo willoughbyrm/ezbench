@@ -162,11 +162,13 @@ class TaskEntry:
 GitCommit = namedtuple('GitCommit', 'sha1 timestamp')
 
 class SmartEzbench:
-    def __init__(self, ezbench_dir, report_name, readonly = False):
+    def __init__(self, ezbench_dir, report_name, readonly = False,
+                 hook_binary_path = None):
         self.readonly = readonly
         self.ezbench_dir = ezbench_dir
         self.report_name = report_name
         self.log_folder = ezbench_dir + '/logs/' + report_name
+        self.hook_binary_path = hook_binary_path
         self.smart_ezbench_state = self.log_folder + "/smartezbench.state"
         self.smart_ezbench_lock = self.log_folder + "/smartezbench.lock"
         self.smart_ezbench_log = self.log_folder + "/smartezbench.log"
@@ -209,6 +211,23 @@ class SmartEzbench:
             if not self.readonly:
                 self.log_file.write(log_msg)
                 self.log_file.flush()
+
+    # WARNING: Call this function after making sure state has an up-to-date state
+    def __call_hook__(self, action, parameters = dict()):
+        if self.hook_binary_path is None:
+            return
+
+        env = os.environ.copy()
+        env["action"] = str(action)
+        env["ezbench_dir"] = str(self.ezbench_dir)
+        env["ezbench_report_name"] = str(self.report_name)
+        env["ezbench_report_path"] = str(self.log_folder)
+        env["ezbench_report_mode"] = str(RunningMode(self.state['mode']).name)
+        for p in parameters:
+            env[p] = str(parameters[p])
+
+        proc = subprocess.Popen([self.hook_binary_path], env=env)
+        proc.wait()
 
     def __grab_lock(self):
         if self.readonly:
@@ -317,12 +336,18 @@ class SmartEzbench:
 
     def __set_running_mode_unlocked__(self, mode):
         # Request an early exit if we go from RUNNING to PAUSE or
+        dsk_mode = self.__running_mode_unlocked__(check_running = False)
         cur_mode = self.__running_mode_unlocked__()
         if cur_mode.value > RunningMode.INTERMEDIATE.value and mode != RunningMode.RUN:
             Ezbench.requestEarlyExit(self.ezbench_dir, self.report_name)
 
         self.__write_attribute_unlocked__('mode', mode.value, allow_updates = True)
         self.__log(Criticality.II, "Ezbench running mode set to '{mode}'".format(mode=mode.name))
+
+        if mode != dsk_mode:
+            params = dict()
+            params['ezbench_report_mode_prev'] = dsk_mode.name
+            self.__call_hook__('mode_changed', params)
 
     def set_running_mode(self, mode):
         if mode.value >= RunningMode.INTERMEDIATE.value:
@@ -569,6 +594,10 @@ class SmartEzbench:
     def __done_running__(self):
         self._task_current = None
         self._task_list = None
+
+        # Call the hook file, telling we are done running
+        self.__call_hook__('done_running_tests')
+
         self._task_lock.release()
 
     @classmethod
@@ -680,6 +709,9 @@ class SmartEzbench:
         # Prioritize --> return a list of commits to do in order
         self._task_lock.acquire()
         self._task_list = self.__prioritize_runs(task_tree, run_info.deployed_commit)
+
+        # Call the hook file, telling we started running
+        self.__call_hook__('start_running_tests')
 
         # Start generating ezbench calls
         while len(self._task_list) > 0:
