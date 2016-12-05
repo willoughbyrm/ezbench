@@ -161,6 +161,15 @@ class TaskEntry:
 
 GitCommit = namedtuple('GitCommit', 'sha1 timestamp')
 
+class SmartEzbenchAttributes(Enum):
+    perf_min_change = 1
+    perf_min_confidence = 2
+
+    schedule_max_commits = 100
+
+    variance_max = 200
+    variance_max_run_count = 201
+
 class SmartEzbench:
     def __init__(self, ezbench_dir, report_name, readonly = False,
                  hook_binary_path = None):
@@ -835,9 +844,53 @@ class SmartEzbench:
 
         return commit_weight * test_weight * severity
 
-    def schedule_enhancements(self, git_history=None, max_variance = 0.025,
-                              perf_diff_confidence = 0.99, smallest_perf_change=0.005,
-                              max_run_count = 20, commit_schedule_max = 1):
+    def __attribute__(self, key, default):
+        self.__reload_state(keep_lock = True)
+        if "attributes" not in self.state:
+            ret = default
+        else:
+            ret = self.state['attributes'].get(key, default)
+        self.__release_lock()
+        return ret
+
+    @classmethod
+    def attributes(cls):
+        return [v.name for v in SmartEzbenchAttributes]
+
+    def attribute(self, param):
+        p = SmartEzbenchAttributes[param]
+        if p == SmartEzbenchAttributes.perf_min_change:
+            return self.__attribute__(param, 0.005)
+        elif p == SmartEzbenchAttributes.perf_min_confidence:
+            return self.__attribute__(param, 0.99)
+        elif p == SmartEzbenchAttributes.schedule_max_commits:
+            return self.__attribute__(param, 1)
+        elif p == SmartEzbenchAttributes.variance_max:
+            return self.__attribute__(param, 0.025)
+        elif p == SmartEzbenchAttributes.variance_max_run_count:
+            return self.__attribute__(param, 20)
+
+    def set_attribute(self, param, value):
+        # verify that the attribute exists
+        p = SmartEzbenchAttributes[param]
+
+        self.__reload_state(keep_lock = True)
+        if "attributes" not in self.state:
+            self.state['attributes'] = dict()
+        self.state['attributes'][param] = float(value)
+        self.__save_state()
+        self.__release_lock()
+
+        self.__log(Criticality.II, "Attribute '{}' set to {}".format(param, value))
+
+    def schedule_enhancements(self, git_history=None):
+        # Read all the attributes
+        max_variance = self.attribute("variance_max")
+        max_run_count = self.attribute("variance_max_run_count")
+        perf_diff_confidence = self.attribute("perf_min_confidence")
+        smallest_perf_change = self.attribute("perf_min_change")
+        commit_schedule_max = self.attribute("schedule_max_commits")
+
         self.__log(Criticality.II, "Start enhancing the report")
 
         # Generate the report, order commits based on the git history

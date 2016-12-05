@@ -83,10 +83,13 @@ def create_report(base_sha1, head_sha1, max_variance = 0.025, reuse_data=True):
 	sbench.force_test_rounds(head_sha1, 'perf_bisect', 3)
 	sbench.force_test_rounds(base_sha1, 'perf_bisect', 3)
 
+	sbench.set_attribute("variance_max", max_variance)
+	sbench.set_attribute("schedule_max_commits", 100)
+
 	# Run until all the enhancements are made!
 	git_history = sbench.git_history()
 	while True:
-		sbench.schedule_enhancements(git_history, max_variance=max_variance, commit_schedule_max=100)
+		sbench.schedule_enhancements(git_history)
 		if not sbench.run():
 			break
 
