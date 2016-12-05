@@ -1516,7 +1516,8 @@ class Report:
 
 
     def enhance_report(self, commits_rev_order, max_variance = 0.025,
-                       perf_diff_confidence = 0.99, smallest_perf_change=0.005):
+                       perf_diff_confidence = 0.99, smallest_perf_change=0.005,
+                       variance_min_run_count = 2):
         if len(commits_rev_order) > 0:
             # Get rid of the commits that are not in the commits list
             to_del = list()
@@ -1609,11 +1610,12 @@ class Report:
                         if subtest_name in unittest_prev:
                             before = unittest_prev[subtest_name]
                             if before is not None and before[0] != result[0]:
-                                if len(before) < 2:
-                                    self.events.append(EventResultNeedsMoreRuns(before, 2))
-                                if len(result) < 2:
-                                    self.events.append(EventResultNeedsMoreRuns(result, 2))
-                                if len(before) >= 2 and len(result) >= 2:
+                                if len(before) < variance_min_run_count:
+                                    self.events.append(EventResultNeedsMoreRuns(before, variance_min_run_count))
+                                if len(result) < variance_min_run_count:
+                                    self.events.append(EventResultNeedsMoreRuns(result, variance_min_run_count))
+                                if (len(before) >= variance_min_run_count and
+                                    len(result) >= variance_min_run_count):
                                     commit_range = EventCommitRange(unittest_prev[subtest_name].commit, commit)
                                     self.events.append(EventUnitResultChange(commit_range,
                                                                              before,

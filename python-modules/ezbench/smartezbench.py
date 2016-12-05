@@ -169,6 +169,7 @@ class SmartEzbenchAttributes(Enum):
 
     variance_max = 200
     variance_max_run_count = 201
+    variance_min_run_count = 202
 
 class SmartEzbench:
     def __init__(self, ezbench_dir, report_name, readonly = False,
@@ -869,6 +870,8 @@ class SmartEzbench:
             return self.__attribute__(param, 0.025)
         elif p == SmartEzbenchAttributes.variance_max_run_count:
             return self.__attribute__(param, 20)
+        elif p == SmartEzbenchAttributes.variance_min_run_count:
+            return self.__attribute__(param, 2)
 
     def set_attribute(self, param, value):
         # verify that the attribute exists
@@ -887,6 +890,7 @@ class SmartEzbench:
         # Read all the attributes
         max_variance = self.attribute("variance_max")
         max_run_count = self.attribute("variance_max_run_count")
+        min_run_count = self.attribute("variance_min_run_count")
         perf_diff_confidence = self.attribute("perf_min_confidence")
         smallest_perf_change = self.attribute("perf_min_change")
         commit_schedule_max = self.attribute("schedule_max_commits")
