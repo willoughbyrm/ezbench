@@ -51,6 +51,15 @@ def break_lists(input_list, sep=" "):
     return res
 
 # parse the options
+attributes_val = dict()
+def AttributeString(v):
+    fields = v.split("=")
+    if len(fields) != 2:
+        raise argparse.ArgumentTypeError("Attributes need the format $name=(float)")
+    else:
+        attributes_val[fields[0]] = fields[1]
+        return fields[0]
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-b", dest='tests', help="<test regexp> include these tests to run",
                     action="append")
@@ -68,6 +77,8 @@ parser.add_argument("-s", dest='add_conf_script', help="Add a configuration scri
                     action="append")
 parser.add_argument("-S", dest='remove_conf_script', help="Remove a configuration script for EzBench's runner",
                     action="append")
+parser.add_argument("-a", dest='attributes', help="Set an attribute",
+                    type=AttributeString, action="append", choices=SmartEzbench.attributes())
 parser.add_argument("report_name", nargs='?')
 parser.add_argument("command", help="Command to execute", nargs='?',
                     choices=('start', 'run', 'pause', 'abort', 'status'))
@@ -128,6 +139,10 @@ if args.add_conf_script is not None:
 if args.remove_conf_script is not None:
     for add in args.remove_conf_script:
         sbench.remove_conf_script(add)
+
+if args.attributes is not None:
+    for attr in set(args.attributes):
+        sbench.set_attribute(attr, float(attributes_val[attr]))
 
 # add commits and tests
 if args.commits is not None and args.tests is not None:
