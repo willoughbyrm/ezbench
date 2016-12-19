@@ -15,10 +15,8 @@ x11:rendercheck_run() {
         [ $? -eq 1 ] && echo "$subtest: str(missing)"
     done
 
-    # Do not add the result "" if a list of subtest was given
-    if [ -z "${testSubTests[$t]}" ]; then
-        echo ": str(complete)"
-    fi
+    # Since we do not support partial runs, say that we ran everything
+    echo ": str(complete)"
 }
 
 test_exec_time=300
