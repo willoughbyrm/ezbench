@@ -743,8 +743,7 @@ class SubTestResult:
             return new_results.mean(), confidence
         elif self.value_type == BenchSubTestType.SUBTEST_STRING:
             # TODO: Try to come up with something a little smarter
-            if (len(self.to_set()) == 1 and len(old_subtestresult.to_set()) == 1 and
-                self.to_list()[0] == old_subtestresult.to_list()[0]):
+            if self.to_set() == old_subtestresult.to_set():
                 return 0, 0
             else:
                 return 1, 1
