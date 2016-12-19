@@ -162,12 +162,13 @@ class TaskEntry:
 GitCommit = namedtuple('GitCommit', 'sha1 timestamp')
 
 class SmartEzbenchAttributes(Enum):
-    perf_min_change = 1
-    perf_min_confidence = 2
+    event_min_confidence = 1
 
     schedule_max_commits = 100
 
-    variance_max = 200
+    perf_min_change = 200
+
+    variance_max = 300
     variance_max_run_count = 201
     variance_min_run_count = 202
 
@@ -862,7 +863,7 @@ class SmartEzbench:
         p = SmartEzbenchAttributes[param]
         if p == SmartEzbenchAttributes.perf_min_change:
             return self.__attribute__(param, 0.005)
-        elif p == SmartEzbenchAttributes.perf_min_confidence:
+        elif p == SmartEzbenchAttributes.event_min_confidence:
             return self.__attribute__(param, 0.99)
         elif p == SmartEzbenchAttributes.schedule_max_commits:
             return self.__attribute__(param, 1)
@@ -891,7 +892,7 @@ class SmartEzbench:
         max_variance = self.attribute("variance_max")
         max_run_count = self.attribute("variance_max_run_count")
         min_run_count = self.attribute("variance_min_run_count")
-        perf_diff_confidence = self.attribute("perf_min_confidence")
+        perf_diff_confidence = self.attribute("event_min_confidence")
         smallest_perf_change = self.attribute("perf_min_change")
         commit_schedule_max = self.attribute("schedule_max_commits")
 
