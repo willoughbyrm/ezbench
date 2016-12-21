@@ -107,7 +107,7 @@ for f in "$IGT_ROOT/tests/"**/*.testlist; do
 	[ -e "$f" ] || continue
 	_bn=$(basename $f)
 	_dn=$(basename $(dirname $f))
-	name="piglit:igt:${_dn}/${_bn%.testlist}"
+	name="piglit:igt:${_dn}%${_bn%.testlist}"
 	eval "${name}_run() { __igt_run__ --test-list "$f" \$@; }"
 	test_name="$test_name $name"
 done
