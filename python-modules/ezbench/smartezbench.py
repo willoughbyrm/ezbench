@@ -301,12 +301,16 @@ class SmartEzbench:
             return False
 
     def __create_ezbench(self, ezbench_path = None, profile = None, report_name = None):
+        """
+        WARNING: The state mutex must be taken!
+        """
         if profile is None:
-            profile = self.profile()
+            profile = self.__read_attribute_unlocked__('profile')
 
+        conf_scripts = self.__read_attribute_unlocked__('conf_scripts', [])
         return Ezbench(ezbench_dir = self.ezbench_dir, profile = profile,
                        report_name = self.report_name,
-                       run_config_scripts = self.conf_scripts())
+                       run_config_scripts = conf_scripts)
 
     def __read_attribute_unlocked__(self, attr, default = None):
         if attr in self.state:
