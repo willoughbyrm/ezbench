@@ -186,6 +186,52 @@ _env_dump_create_file(const char *base_path)
 	return file;
 }
 
+static void
+remove_env_dump_from_ld_preload() {
+	const char *preload = getenv("LD_PRELOAD");
+	const char *env_dump_pos, *begin, *after = NULL;
+	size_t before_end, new_size;
+	char *new;
+
+	/* look for env_dump.so */
+	env_dump_pos = strstr(preload, "env_dump.so");
+	if (!env_dump_pos)
+		return;
+
+	/* check if there is anything after env_dump.so */
+	if (env_dump_pos[11] != '\0' && env_dump_pos[12] != '\0')
+		after = env_dump_pos + 12;
+
+	/* find the beginning */
+	begin = env_dump_pos;
+	while (begin != preload && *begin != ':')
+		begin--;
+	before_end = begin - preload;
+
+	/* compute the size of the new string */
+	new_size = before_end;
+	if (after)
+		new_size += 1 + strlen(after);
+
+	/* if the expected string size is 0, just unset the current value */
+	if (new_size == 0)
+		unsetenv("LD_PRELOAD");
+
+	/* construct the new string */
+	new = malloc(new_size + 1);
+	if (new == NULL)
+		return;
+	strncpy(new, preload, before_end);
+	if (after) {
+		new[before_end] = ':';
+		strcpy(new+before_end+1, after);
+	} else
+		new[before_end] = '\0';
+
+	setenv("LD_PRELOAD", new, 1);
+	free(new);
+}
+
 __attribute__((constructor)) static void
 init()
 {
@@ -208,6 +254,9 @@ init()
 		_env_ignored = 1;
 		env_file = fopen("/dev/null", "w");
 	} else {
+		/* get rid of env_dump.so from LD_PRELOAD to prevent double loading */
+		remove_env_dump_from_ld_preload();
+
 		/* handle some signals that would normally result in an exit without
 		* calling the fini functions. This will hopefully be done before any
 		* other library does it. It is however OK if the program replaces the
