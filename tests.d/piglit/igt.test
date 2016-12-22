@@ -20,9 +20,10 @@ function __igt_run__ {
     piglit_output=${run_log_file}_tmp
 
     # start piglit
-    local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" ./piglit run $PIGLIT_RUN_PARAMS $parameters $testlist tests/igt.py ${piglit_output}"
+    local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $REPO_PIGLIT/piglit run $PIGLIT_RUN_PARAMS $parameters $testlist tests/igt.py ${piglit_output}"
 
-    ENV_DUMP_RESTRICT_TO_BINARY=/usr/bin/glxinfo \
+    ENV_DUMP_REQUIRE_ARGUMENT="$REPO_PIGLIT/piglit" \
+    ENV_DUMP_NO_METRICS=1 \
     run_bench 0 $cmdline > /dev/null 2> /dev/null
     local exit_code=$?
 

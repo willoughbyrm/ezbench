@@ -21,10 +21,11 @@ function __piglit_run__ {
     piglit_output=${run_log_file}_tmp
 
     # start piglit
-    local cmdline="./piglit run -p $backend $PIGLIT_RUN_PARAMS $testlist $testscript ${piglit_output}"
+    local cmdline="$REPO_PIGLIT/piglit run -p $backend $PIGLIT_RUN_PARAMS $testlist $testscript ${piglit_output}"
     hash xterm && cmdline="xterm -geometry +0+300 -e 'echo $cmdline; $cmdline'"
 
-    ENV_DUMP_RESTRICT_TO_BINARY=/usr/bin/glxinfo \
+    ENV_DUMP_REQUIRE_ARGUMENT="$REPO_PIGLIT/piglit" \
+    ENV_DUMP_NO_METRICS=1 \
     run_bench 0 $cmdline > /dev/null 2> /dev/null
     local exit_code=$?
 
