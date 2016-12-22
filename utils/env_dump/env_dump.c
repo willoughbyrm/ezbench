@@ -152,6 +152,9 @@ _env_dump_create_file(const char *base_path)
 	char *path;
 	int fd;
 
+	if (!base_path || base_path[0] == '\0')
+		return NULL;
+
 	if (check_restrictions())
 		return NULL;
 
