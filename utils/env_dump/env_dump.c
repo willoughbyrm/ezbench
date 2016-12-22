@@ -155,7 +155,7 @@ _env_dump_create_file(const char *base_path)
 	if (!base_path || base_path[0] == '\0')
 		return NULL;
 
-	if (check_restrictions())
+	if (_env_ignored)
 		return NULL;
 
 	/* if the file asked by the user already exists, append the pid to the
@@ -190,14 +190,17 @@ __attribute__((constructor)) static void
 init()
 {
 	const char *base_path = getenv("ENV_DUMP_FILE");
-	if (base_path == NULL)
-		base_path = "/tmp/env_dump";
+	if (!base_path || check_restrictions()) {
+		_env_ignored = 1;
+		env_file = fopen("/dev/null", "w");
+		return;
+	}
 
 	_env_debug = getenv("ENV_DUMP_DEBUG") ? 1 : 0;
 
 	if (strcmp(base_path, "stderr") != 0) {
 		env_file = _env_dump_create_file(base_path);
-	} else if (!check_restrictions()){
+	} else {
 		env_file = stderr;
 	}
 
