@@ -349,8 +349,14 @@ class TestRun:
     def __init__(self, testResult, testType, runFile, metricsFiles, mainValueType = None, mainValue = None):
         self.test_result = testResult
         self.run_file = runFile
-        self.main_value_type = mainValueType
-        self.main_value = mainValue
+
+        # Ignore the main value for units, as they are pointless anyway
+        if testType != "unit":
+            self.main_value_type = mainValueType
+            self.main_value = mainValue
+        else:
+            self.main_value_type = None
+            self.main_value = None
 
         self._results = dict()
 
