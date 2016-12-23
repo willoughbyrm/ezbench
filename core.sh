@@ -119,7 +119,7 @@ function run_bench {
     fi
 
     local time_after=$(date +%s.%N)
-    local test_exec_time=$(echo "$time_after - $time_before" | bc -l)
+    test_exec_time=$(echo "$time_after - $time_before" | bc -l)
     callIfDefined run_bench_post_hook
 
     # If the test does not have subtests, then store the execution time
@@ -139,7 +139,6 @@ function run_bench {
         cat "$run_log_file_stderr" >&2
     fi
 
-    echo "EZBENCH:test_exec_time:$test_exec_time"
     return $exit_code
 }
 

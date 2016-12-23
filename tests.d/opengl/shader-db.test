@@ -7,7 +7,8 @@ function shaderdb_run() {
     hash xterm && cmdline="xterm -e 'echo $cmdline; $cmdline'"
 
     vblank_mode=0 ENV_DUMP_RESTRICT_TO_BINARY="no_dumps"\
-    run_bench 0 $cmdline | grep "EZBENCH:test_exec_time:" | cut -d : -f 3
+    run_bench 0 $cmdline > /dev/null
+    echo $test_exec_time
 }
 
 test_name="shaderdb"
