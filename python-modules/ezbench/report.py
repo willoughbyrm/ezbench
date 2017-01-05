@@ -885,7 +885,7 @@ class Commit:
         self.full_name = full_name
         self.label = label
 
-        self.results = []
+        self.results = dict()
         self.geom_mean_cache = -1
         self.oldness_factor = 0
 
@@ -997,7 +997,7 @@ class Commit:
         # compute the variance
         s = 1
         n = 0
-        for result in self.results:
+        for result in self.results.values():
             testresults = result.result()
             if len(testresults) > 0:
                 s *= testresults.mean()
@@ -1014,7 +1014,7 @@ class Commit:
         """ Returns the list of results found on this commit"""
 
         results = set()
-        for result in self.results:
+        for result in self.results.values():
             for key in result.results():
                 results.add(Test.partial_name(result.test.full_name, [key]))
         return results
@@ -1026,14 +1026,14 @@ class Commit:
         if len(subtests) > 1:
             raise ValueError("The result name contains more than one result")
 
-        for r in self.results:
-            if r.test.full_name == basename:
-                key = None
-                if len(subtests) > 0:
-                    key = subtests[0]
-                return r.result(key)
-
-        return None
+        r = self.results.get(basename, None)
+        if r is not None:
+            key = None
+            if len(subtests) > 0:
+                key = subtests[0]
+            return r.result(key)
+        else:
+            return None
 
 class EventCommitRange:
     def __init__(self, old, new = None, commit_graph = None):
@@ -1528,37 +1528,33 @@ class Report:
                     metricsFiles = dict()
                     for runFile in runsFiles:
                         metricsFiles[runFile] = list()
-                        metrics_re = re.compile(r'^{}.metrics_.+$'.format(runFile))
-                        for metric_file in [f for f,t in testFiles[sha1] if metrics_re.search(f)]:
-                            metricsFiles[runFile].append(metric_file)
+                        if False: # TODO: Get rid of the if when we start doing anything with the metrics
+                            metrics_re = re.compile(r'^{}.metrics_.+$'.format(runFile))
+                            for metric_file in [f for f,t in testFiles[sha1] if metrics_re.search(f)]:
+                                metricsFiles[runFile].append(metric_file)
 
                     # Create the result object
                     try:
                         result = TestResult(commit, test, testType, testFile, runsFiles, metricsFiles)
 
                         # Add the result to the commit's results
-                        commit.results.append(result)
+                        commit.results[test.full_name] = result
                         commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
                     except Exception as e:
                         traceback.print_exc(file=sys.stderr)
                         sys.stderr.write("\n")
                         pass
 
-            # Add the information about the runtime
-            result = TestResult(commit, ezbench_runner, "commit_result", None, None, None)
-            commit.results.append(result)
-
             # Add the information about the runtime and the commit to the list of commits
             # INFO: Do not add the commit if we got no meaningful results for it
             if len(commit.results) > 0 or commit.compil_exit_code != EzbenchExitCode.UNKNOWN:
                 result = TestResult(commit, ezbench_runner, "commit_result", None, None, None)
-                commit.results.append(result)
-                commit.results = sorted(commit.results, key=lambda res: res.test.full_name)
+                commit.results[result.test.full_name] = result
                 self.commits.append(commit)
 
         # Go through all the runs and add the missing results
         for commit in self.commits:
-            for result in commit.results:
+            for result in commit.results.values():
                 for run in result.runs:
                     run.tag_missing_results()
 
@@ -1578,16 +1574,10 @@ class Report:
         return None
 
     def find_result(self, commit, test):
-        for result in commit.results:
-            if result.test == test:
-                return result
-        return None
+        return commit.get(test.full_name, None)
 
     def find_result_by_name(self, commit, test_full_name):
-        for result in commit.results:
-            if result.test.full_name == test_full_name:
-                return result
-        return None
+        return commit.get(test_full_name, None)
 
     def overlay_graphs(self, scm):
         overlay = ResultsDAG(scm)
@@ -1670,6 +1660,7 @@ class Report:
         # Generate the overlay graph containing every commit with results for
         # all the results we have.
         overlay = self.overlay_graphs(scm)
+        overlay.to_dot_format("overlay.dot")
 
         # Compute the list of results we have adjacent with our parents in
         # the overlay graph

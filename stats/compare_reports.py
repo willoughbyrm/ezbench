@@ -127,7 +127,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 
 		db['reference_name'] = "{} ({})".format(reference_report.name, ref_commit.label)
 		db['reference'] = reference_report
-		for result in ref_commit.results:
+		for result in ref_commit.results.values():
 			average_raw = result.result().mean()
 			average = convert_unit(average_raw, result.unit, output_unit)
 			average = float("{0:.2f}".format(average))
@@ -157,7 +157,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 
 		for event in report.events:
 			if type(event) is EventPerfChange:
-				for result in event.commit_range.new.results:
+				for result in event.commit_range.new.results.values():
 					if result.test.full_name != event.test.full_name:
 						continue
 					result.annotation = str(event)
@@ -165,7 +165,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 		# add all the commits
 		for commit in report.commits:
 			# drop the no-op results
-			commit.results = list(filter(lambda r: r.test.full_name != "no-op", commit.results))
+			#commit.results = list(filter(lambda r: r.test.full_name != "no-op", commit.results))
 			if len(commit.results) == 0 and not hasattr(commit, 'annotation'):
 				continue
 
@@ -183,7 +183,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 			# Add the results and perform some stats
 			score_sum = 0
 			count = 0
-			for result in commit.results:
+			for result in commit.results.values():
 				if not result.test.full_name in db["tests"]:
 					db["tests"].append(result.test.full_name)
 					db["metrics"][result.test.full_name] = []
@@ -899,7 +899,7 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 
 						for report in db['reports']:
 							for commit in report.commits:
-								for result in commit.results:
+								for result in commit.results.values():
 									if result.test.full_name != test:
 										continue
 									if result.test_type != "unit":
