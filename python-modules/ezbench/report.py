@@ -1722,15 +1722,16 @@ def readCsv(filepath):
                     continue
 
                 # try to extract information from the header
-                m1 = h1.match(row[0])
-                m2 = h2.match(row[0])
-                if m2 is not None:
-                    # groups: unit type, more|less qualifier, test, commit/version, commit_sha1
-                    unit = m2.groups()[0]
-                    more_is_better = m2.groups()[1].lower() == "more"
-                elif m1 is not None:
-                    # groups: unit type, test, commit_sha1
-                    unit = m1.groups()[0]
+                if unit is None:
+                    m1 = h1.match(row[0])
+                    m2 = h2.match(row[0])
+                    if m2 is not None:
+                        # groups: unit type, more|less qualifier, test, commit/version, commit_sha1
+                        unit = m2.groups()[0]
+                        more_is_better = m2.groups()[1].lower() == "more"
+                    elif m1 is not None:
+                        # groups: unit type, test, commit_sha1
+                        unit = m1.groups()[0]
 
                 # Read the actual data
                 if len(row) > 0 and not row[0].startswith("# "):
