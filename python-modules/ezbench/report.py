@@ -40,6 +40,7 @@ import traceback
 import atexit
 import pprint
 import fcntl
+import mmap
 import time
 import json
 import glob
@@ -468,39 +469,29 @@ class TestRun:
     def __add_metrics__(self, metric_file):
         values = dict()
         with open(metric_file, 'rt') as f:
-
             # Do not try to open files bigger than 1MB
             if os.fstat(f.fileno()).st_size > 1e6:
                 print('The metric file \'{}\' is too big (> 1MB)'.format(metric_file), file=sys.stderr)
                 return
 
-            reader = csv.DictReader(f)
-            try:
-                # Collect stats about each metrics
-                for row in reader:
-                    if row is None or len(row) == 0:
-                        continue
+            field_names = None
+            fields_values = list()
+            mmaped_file = mmap.mmap(f.fileno(), 0, prot=mmap.PROT_READ)
+            for line in iter(mmaped_file.readline, ""):
+                fields = line.decode().split(',')
+                if field_names is None:
+                    field_names = fields
+                    for i in range(0, len(fields)):
+                        fields_values.append(list())
+                elif len(fields) == len(field_names):
+                    for i in range(0, len(fields)):
+                        fields_values[i].append(float(fields[i]))
+                else:
+                    break
 
-                    # Verify that all the fields are present or abort...
-                    allValuesOK = True
-                    for field in values:
-                        if row[field] is None:
-                            allValuesOK = False
-                            break
-                    if not allValuesOK:
-                        break
-
-                    for field in row:
-                        if field not in values:
-                            values[field] = list()
-                        try:
-                            f = float(row[field])
-                            values[field].append(f)
-                        except ValueError as e:
-                            print("In file {}: cannot convert field {}'s value '{}' to float!".format(metric_file, field, row[field]))
-            except csv.Error as e:
-                sys.stderr.write('file %s, line %d: %s\n' % (filepath, reader.line_num, e))
-                return
+            for i in range(0, len(field_names)):
+                values[field_names[i]] = fields_values[i]
+            mmaped_file.close()
 
         # Find the time values and store them aside after converting them to seconds
         time_unit_re = re.compile(r'^time \((.+)\)$')
