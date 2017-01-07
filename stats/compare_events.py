@@ -70,12 +70,12 @@ def reports_to_html(reports, output, title=None, verbose=False, embed=True):
             print("Output HTML generated at: {}".format(output))
 
 
-def gen_report(log_folder, restrict_commits):
+def gen_report(log_folder, restrict_commits, quiet):
     report_name = os.path.basename(os.path.abspath(log_folder))
 
     try:
         sbench = SmartEzbench(ezbench_dir, report_name, readonly=True)
-        report = sbench.report(restrict_to_commits=restrict_commits)
+        report = sbench.report(restrict_to_commits=restrict_commits, silentMode=not quiet)
     except RuntimeError:
         report = Report(log_folder, restrict_to_commits=restrict_commits)
         report.enhance_report(NoRepo(log_folder))
@@ -107,6 +107,6 @@ if __name__ == "__main__":
 
     reports = []
     for log_folder in set(args.log_folder):
-        reports.append(gen_report(log_folder, restrict_commits))
+        reports.append(gen_report(log_folder, restrict_commits, not args.quiet))
 
     reports_to_html(reports, args.output, args.title, not args.quiet)

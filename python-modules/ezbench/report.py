@@ -1366,6 +1366,7 @@ class Journal:
 class Report:
     def __init__(self, log_folder, silentMode = False, restrict_to_commits = []):
         self.log_folder = log_folder
+        self.silentMode = silentMode
         self.name = os.path.basename(os.path.abspath(log_folder))
 
         self.journal = Journal(self.log_folder + "/journal")
@@ -1377,7 +1378,7 @@ class Report:
 
         self._cached_walk = dict()
 
-        self.__parse_report__(silentMode, restrict_to_commits)
+        self.__parse_report__(restrict_to_commits)
 
     def __readNotes__(self):
         try:
@@ -1405,7 +1406,16 @@ class Report:
 
         return labels
 
-    def __parse_report__(self, silentMode, restrict_to_commits):
+    def log(self, msg, temporary=False):
+        if self.silentMode:
+            return
+
+        sys.stdout.write(msg)
+        sys.stdout.write(" " * (79 - len(msg)))
+        sys.stdout.write("\r")
+        sys.stdout.flush()
+
+    def __parse_report__(self, restrict_to_commits):
         # Save the current working directory and switch to the log folder
         cwd = os.getcwd()
         os.chdir(self.log_folder)
@@ -1418,7 +1428,7 @@ class Report:
             finally:
                 f.close()
         except IOError:
-            if not silentMode:
+            if not self.silentMode:
                 sys.stderr.write("The log folder '{0}' does not contain a commit_list file\n".format(self.log_folder))
             return False
 
@@ -1427,14 +1437,17 @@ class Report:
 
         # Check that there are commits
         if (len(commitsLines) == 0):
-            if not silentMode:
-                sys.stderr.write("The commit_list file is empty\n")
+            self.log("The commit_list file is empty\n")
             return False
+
+        self.log("Listing the results' files", temporary=True)
 
         # Find all the result files and sort them by sha1
         files_list = os.listdir()
         testFiles = dict()
+        testResults = dict()
         commit_test_file_re = re.compile(r'^(.+)_(bench|unit|imgval|unified)_[^\.]+(.metrics_[^\.]+)?$')
+        results_count = 0
         for f in files_list:
             if os.path.isdir(f):
                 continue
@@ -1443,18 +1456,33 @@ class Report:
                 sha1 = m.groups()[0]
                 if sha1 not in testFiles:
                     testFiles[sha1] = []
-                testFiles[sha1].append((f, m.groups()[1]))
+                result_type = m.groups()[1]
+                testFiles[sha1].append((f, result_type))
+
+                 # Skip on unrelated files
+                if "." in f:
+                    continue
+
+                # Skip when the file is a run file (finishes by #XX)
+                if result_type != "unified" and re.search(r'#\d+$', f) is not None:
+                    continue
+
+                if sha1 not in testResults:
+                    testResults[sha1] = []
+                testResults[sha1].append((f, result_type))
+                results_count += 1
         files_list = None
+
+        self.log("Found {} results across {} commits".format(results_count, len(commitsLines)))
 
         # Verify the state of the commits
         ezbench_runner = Test("ezbench_runner")
         self.tests.append(ezbench_runner)
 
         # Gather all the information from the commits
-        if not silentMode:
-            print ("Reading the results for {0} commits".format(len(commitsLines)))
         commits_txt = ""
         table_entries_txt = ""
+        result_cur = 0
         for commitLine in commitsLines:
             full_name = commitLine.strip(' \t\n\r')
             sha1 = commitLine.split()[0]
@@ -1466,27 +1494,20 @@ class Report:
             commit = Commit(self, sha1, full_name, label)
 
             # If there are no results, just continue
-            if sha1 not in testFiles:
+            if sha1 not in testResults:
                 continue
-
-            # find all the tests
-            if sha1 in testFiles:
+            else:
                 handled_tests = set()
-                for testFile, testType in testFiles[sha1]:
-                    # Skip on unrelated files
-                    if "." in testFile:
-                        continue
-
-                    # Skip when the file is a run file (finishes by #XX)
-                    if testType != "unified" and re.search(r'#\d+$', testFile) is not None:
-                        continue
-
+                for testFile, testType in testResults[sha1]:
                     # Unified-formated runs should not have the # in their name
                     testFile = testFile.split("#")[0]
                     if testFile not in handled_tests:
                         handled_tests.add(testFile)
                     else:
                         continue
+
+                    result_cur += 1
+                    self.log("Reading result {}/{}".format(result_cur, results_count), temporary=True)
 
                     # Get the test name
                     test_name = testFile[len(commit.sha1) + len(testType) + 2:]
@@ -1574,13 +1595,23 @@ class Report:
         if len(self.commits) == 1:
             return overlay
 
+        self.log("Generate the results overlay graph", temporary=True)
+
         g = scm.subDAG([c.full_sha1 for c in self.commits])
+        count = 1
         for commit in self.commits:
+            self.log("Overlay graph: get results list for commit {}/{}".format(count, len(g)), temporary=True)
+            count += 1
+
             full_sha1 = scm.full_version_name(commit.sha1)
             overlay.set_results(full_sha1, commit.results_set())
             g.set_results(full_sha1, commit.results_set())
 
+        count = 1
         for commit in self.commits:
+            self.log("Overlay graph: Find closests result [{}/{}]".format(count, len(self.commits)), temporary=True)
+            count += 1
+
             # Look for the closest commits from this position and add them to
             # the overlay
             w = scm.full_version_name(commit.sha1)
@@ -1649,8 +1680,11 @@ class Report:
 
         # For all results, find what are the changes
         variance_cache = dict()
-        r = 0
+        count = 1
         for result in results:
+            self.log("Analyse result {}/{}".format(count, len(results)), temporary=True)
+            count += 1
+
             bottom_leaves = set(overlay.nodes())
             for child in overlay.nodes():
                  # Skip if the result is not present on the current node

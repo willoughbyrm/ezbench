@@ -813,9 +813,9 @@ class SmartEzbench:
         return self._cache_repo_
 
     def report(self, reorder_commits = True,
-               restrict_to_commits = []):
+               restrict_to_commits = [], silentMode = True):
         # Generate the report, order commits based on the git history
-        r = Report(self.log_folder, silentMode = True,
+        r = Report(self.log_folder, silentMode,
                                  restrict_to_commits = restrict_to_commits)
         r.enhance_report(self.repo())
 
