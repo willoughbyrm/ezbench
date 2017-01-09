@@ -1528,10 +1528,9 @@ class Report:
                     metricsFiles = dict()
                     for runFile in runsFiles:
                         metricsFiles[runFile] = list()
-                        if False: # TODO: Get rid of the if when we start doing anything with the metrics
-                            metrics_re = re.compile(r'^{}.metrics_.+$'.format(runFile))
-                            for metric_file in [f for f,t in testFiles[sha1] if metrics_re.search(f)]:
-                                metricsFiles[runFile].append(metric_file)
+                        metrics_re = re.compile(r'^{}.metrics_.+$'.format(runFile))
+                        for metric_file in [f for f,t in testFiles[sha1] if metrics_re.search(f)]:
+                            metricsFiles[runFile].append(metric_file)
 
                     # Create the result object
                     try:
