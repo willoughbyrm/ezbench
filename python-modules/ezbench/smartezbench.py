@@ -663,7 +663,7 @@ class SmartEzbench:
             task_tree = copy.deepcopy(state['commits'])
 
             for commit in report.commits:
-                for result in commit.results:
+                for result in commit.results.values():
                     for key in result.results():
                         full_name = Test.partial_name(result.test.full_name, [key])
                         SmartEzbench.__remove_task_from_tasktree__(task_tree, commit.full_sha1, full_name, len(result.result(key)))
