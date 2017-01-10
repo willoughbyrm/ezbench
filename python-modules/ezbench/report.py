@@ -1659,7 +1659,6 @@ class Report:
         # Generate the overlay graph containing every commit with results for
         # all the results we have.
         overlay = self.overlay_graphs(scm)
-        overlay.to_dot_format("overlay.dot")
 
         # Compute the list of results we have adjacent with our parents in
         # the overlay graph
