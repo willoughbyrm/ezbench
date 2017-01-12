@@ -59,42 +59,64 @@ function auto_deploy_make_and_deploy() {
     # Call the user-defined pre-compile hook
     callIfDefined compile_pre_hook
 
+    # Default to saying that there was a deployment error
+    local compile_error=72
+
     # First, check if we already have compiled the wanted version
     repo_deploy_version
     local depl_version=$(profile_repo_deployed_version)
 
     # If we did not get the expected version, let's compile it
-    if [[ "$depl_version" != "$version" ]]
-    then
-        echo "$(date +"%m-%d-%Y-%T"): Start compiling version $version"
-        local compile_start=$(date +%s)
+    if [[ "$depl_version" != "$version" ]]; then
+        # Verify that the commit is not marked as broken
+        local dep_version_dir=$(profile_repo_deployment_version_dir)
+        local broken_commit_file="$dep_version_dir/ezbench_marked_broken"
+        if [[ -d "$dep_version_dir" && ! -e "$broken_commit_file" ]]; then
+            echo "$(date +"%m-%d-%Y-%T"): Start compiling version $version"
+            local compile_start=$(date +%s)
 
-        profile_repo_compile_start $version
-        local exit_code=$?
-        [ $exit_code -ne 0 ] && return $exit_code
+            profile_repo_compile_start $version
+            local exit_code=$?
+            [ $exit_code -ne 0 ] && return $exit_code
 
-        repo_compile_version
-        local compile_error=$?
+            repo_compile_version
+            local compile_error=$?
 
-        profile_repo_compile_stop
+            profile_repo_compile_stop
 
-        if [[ $compile_error -eq 0 || $compile_error -eq 74 ]]; then
-            # compute the compilation time
-            local compile_end=$(date +%s)
-            local build_time=$(($compile_end-$compile_start))
-            echo "$(date +"%m-%d-%Y-%T"): Done compiling version $version (exit code=$compile_error). Build time = $build_time."
+            if [[ $compile_error -eq 0 || $compile_error -eq 74 ]]; then
+                # compute the compilation time
+                local compile_end=$(date +%s)
+                local build_time=$(($compile_end-$compile_start))
+                echo "$(date +"%m-%d-%Y-%T"): Done compiling version $version (exit code=$compile_error). Build time = $build_time."
 
-            # Update our build time estimator
-            "$ezBenchDir/timing_DB/timing.py" -n build -k "$profile" -a $build_time
-            local avgBuildTime=$(profile_repo_compilation_time)
-            local avgBuildTime=$(bc <<< "0.75*$avgBuildTime + 0.25*$build_time")
-            profile_repo_set_compilation_time $avgBuildTime
+                # Update our build time estimator
+                "$ezBenchDir/timing_DB/timing.py" -n build -k "$profile" -a $build_time
+                local avgBuildTime=$(profile_repo_compilation_time)
+                local avgBuildTime=$(bc <<< "0.75*$avgBuildTime + 0.25*$build_time")
+                profile_repo_set_compilation_time $avgBuildTime
 
-            # Call the user-defined post-compile hook
-            callIfDefined deploy_pre_hook
+                # Call the user-defined post-compile hook
+                callIfDefined deploy_pre_hook
 
-            # Now deploy the version that we compiled
-            repo_deploy_version
+                # Now deploy the version that we compiled
+                repo_deploy_version
+
+                # If compile_error == 0, this means that the deployment was successful
+                # and did not require a reboot. Verify that the version is the
+                # wanted one and, if not, say the deployment failed.
+                if [[ $compile_error -eq 0 ]]; then
+                    local depl_version=$(profile_repo_deployed_version)
+                    if [[ "$depl_version" != "$version" ]]; then
+                        local compile_error=72
+
+                        # Mark the commit as broken, to avoid recompilations
+                        touch "$broken_commit_file"
+                    fi
+                fi
+            fi
+        else
+            echo "$(date +"%m-%d-%Y-%T"): Commit marked as broken. Remove '$broken_commit_file' if this is incorrect."
         fi
     else
         echo "$(date +"%m-%d-%Y-%T"): Found a cached version of the compilation, re-use it!"
