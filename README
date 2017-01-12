@@ -361,18 +361,3 @@ This command will create an HTML report named
 logs/public_benchmarks_trend_broadwell/index.html. Nothing more, nothing less.
 
     ./stats/gen_report.py logs/public_benchmarks_trend_broadwell/
-
-
-== utils/perf_bisect.py ==
-
-WARNING: The introduction of smart ezbench made this tool absolutely useless
-
-The perf_bisect.py tool allows bisecting performance issues. It is quite trivial
-to use, so just check out the example.
-
-=== Examples ===
-
-The following command will bisect a performance difference between commit
-HEAD~100 and HEAD. The -p, -b, -r and -m arguments are the same as core.sh.
-
-    utils/perf_bisect.py -p ~/repos/mesa -b glxgears:window -r 1 HEAD~100 HEAD
