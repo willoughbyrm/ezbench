@@ -71,7 +71,7 @@ function auto_deploy_make_and_deploy() {
         # Verify that the commit is not marked as broken
         local dep_version_dir=$(profile_repo_deployment_version_dir)
         local broken_commit_file="$dep_version_dir/ezbench_marked_broken"
-        if [[ -d "$dep_version_dir" && ! -e "$broken_commit_file" ]]; then
+        if [[ ! -e "$broken_commit_file" ]]; then
             echo "$(date +"%m-%d-%Y-%T"): Start compiling version $version"
             local compile_start=$(date +%s)
 
