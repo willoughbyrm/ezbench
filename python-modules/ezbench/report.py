@@ -1494,9 +1494,7 @@ class Report:
             commit = Commit(self, sha1, full_name, label)
 
             # If there are no results, just continue
-            if sha1 not in testResults:
-                continue
-            else:
+            if sha1 in testResults:
                 handled_tests = set()
                 for testFile, testType in testResults[sha1]:
                     # Unified-formated runs should not have the # in their name
