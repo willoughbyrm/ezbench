@@ -970,6 +970,21 @@ class SmartEzbench:
                 event_prio = 1
                 test_name_to_run = str(e.full_name)
                 runs = len(e.result)
+            elif type(e) is EventBuildStatusChanged:
+                if e.commit_range.is_single_commit():
+                    continue
+
+                # Find the middle commit
+                middle = e.commit_range.bisect_point(ignore_commits)
+                if middle is None:
+                    continue
+
+                # Schedule the work
+                commit_sha1 = middle
+                severity = 1
+                event_prio = 0.1
+                test_name_to_run = "no-op"
+                runs = 1
             elif type(e) is EventUnitResultUnstable:
                 # Nothing to do, for now
                 continue
