@@ -1128,8 +1128,7 @@ class EventCommitRange:
             return []
 
         scores = self.commit_graph.bisecting_scores(self.new.full_sha1)
-        filter(lambda x: x[0] not in ignore_commits, scores)
-        return scores
+        return list(filter(lambda x: x[0] not in ignore_commits, scores))
 
     def __eq__(x, y):
         if x.is_single_commit() and y.is_single_commit():
