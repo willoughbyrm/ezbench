@@ -48,7 +48,7 @@ If you plan on recompiling drivers (such as mesa or the kernel), you will need:
 
 To run the xserver, you will need the following applications:
  - chvt
- - sudo (with the testuser setup not to ask for passwords)
+ - sudo (set up not to ask for passwords in /etc/sudoers)
  - Xorg
  - xrandr
  - xset
