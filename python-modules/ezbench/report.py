@@ -1573,10 +1573,10 @@ class Report:
         return None
 
     def find_result(self, commit, test):
-        return commit.get(test.full_name, None)
+        return commit.results.get(test.full_name, None)
 
     def find_result_by_name(self, commit, test_full_name):
-        return commit.get(test_full_name, None)
+        return commit.results.get(test_full_name, None)
 
     def overlay_graphs(self, scm):
         overlay = ResultsDAG(scm)
