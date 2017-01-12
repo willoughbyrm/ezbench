@@ -934,7 +934,7 @@ class SmartEzbench:
                 test_name_to_run = test.full_name
                 runs = (len(result_old) + len(result_new)) / 2
             elif isinstance(e, EventResultNeedsMoreRuns):
-                commit_sha1 = e.result.commit.sha1
+                commit_sha1 = e.result.commit.full_sha1
                 missing_runs = max(1, e.wanted_n() - len(e.result)) # Schedule at least 1 more runs
                 severity = min(missing_runs / len(e.result), 1)
                 event_prio = 1
