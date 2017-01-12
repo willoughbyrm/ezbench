@@ -748,6 +748,11 @@ class SubTestResult:
                 return 0, 0
             else:
                 return 1, 1
+        elif self.value_type == BenchSubTestType.SUBTEST_COMMIT_RESULT:
+            if self.commit.compil_exit_code == old_subtestresult.commit.compil_exit_code:
+                return 0, 0
+            else:
+                return 1, 1
         else:
             return self.to_liststat().compare(old_subtestresult.to_liststat())
 
@@ -1715,11 +1720,6 @@ class Report:
                     commit_parent = self.find_commit_by_id(parent)
                     before = commit_parent.result_by_name(result)
 
-                    # handle build failures
-                    if before.value_type == BenchSubTestType.SUBTEST_COMMIT_RESULT:
-                        if commit_parent.compil_exit_code != commit_child.compil_exit_code:
-                            self.events.append(EventBuildStatusChanged(commit_range))
-
                     # Generate variance events if necessary
                     variance_too_high_before = self.__enhance_report_check_variance__(variance_cache, before, max_variance)
                     variance_too_high_after = self.__enhance_report_check_variance__(variance_cache, after, max_variance)
@@ -1755,6 +1755,8 @@ class Report:
                                 potential_changes.append((parent, before, after, diff, confidence))
                             else:
                                 has_one_inconclusive_parent = True
+                        elif before.value_type == BenchSubTestType.SUBTEST_COMMIT_RESULT:
+                            potential_changes.append((parent, before, after, diff, confidence))
                     else:
                         # Mark that we have found at least one case where the
                         # child and the parent have the same results
@@ -1783,6 +1785,8 @@ class Report:
                             self.events.append(EventRenderingChange(commit_range,
                                                                     after, diff,
                                                                     confidence))
+                        elif before.value_type == BenchSubTestType.SUBTEST_COMMIT_RESULT:
+                            self.events.append(EventBuildStatusChanged(commit_range))
 
             # Now compare all the bottom leaves to see if they match, if they
             # don't, then we need to add the merge base for testing!
