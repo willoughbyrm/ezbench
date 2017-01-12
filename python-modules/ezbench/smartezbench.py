@@ -878,7 +878,7 @@ class SmartEzbench:
 
         self.__log(Criticality.II, "Attribute '{}' set to {}".format(param, value))
 
-    def schedule_enhancements(self, git_history=None):
+    def schedule_enhancements(self):
         # Read all the attributes
         max_variance = self.attribute("variance_max")
         max_run_count = self.attribute("variance_max_run_count")
