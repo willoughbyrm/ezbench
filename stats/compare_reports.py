@@ -1055,7 +1055,7 @@ def gen_report(log_folder, restrict_commits):
 
 	try:
 		sbench = SmartEzbench(ezbench_dir, report_name, readonly=True)
-		report = sbench.report(restrict_to_commits = restrict_commits)
+		report = sbench.report(restrict_to_commits = restrict_commits, silentMode=False)
 	except RuntimeError:
 		report = Report(log_folder, restrict_to_commits = restrict_commits)
 		report.enhance_report(NoRepo(log_folder))
