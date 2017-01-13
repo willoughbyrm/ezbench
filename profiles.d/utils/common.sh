@@ -131,8 +131,11 @@ function xserver_reset() {
     # Check for dependencies
     has_binary xrandr || return 1
 
-    xrandr --auto 2> /dev/null 2> /dev/null
-
+    if [ -z "$XRANDR_RESET_ARGS" ]; then
+        xrandr --auto 2> /dev/null 2> /dev/null
+    else
+        xrandr $XRANDR_RESET_ARGS
+    fi
     return $?
 }
 
