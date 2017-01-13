@@ -148,9 +148,6 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 	for report in reports:
 		db["reports"].append(report)
 
-		# drop the no-op test
-		report.tests = list(filter(lambda b: b.full_name != "no-op", report.tests))
-
 		# make sure all the tests are listed in db["envs"]
 		for test in report.tests:
 			db["envs"][test.full_name] = dict()
@@ -164,8 +161,6 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 
 		# add all the commits
 		for commit in report.commits:
-			# drop the no-op results
-			#commit.results = list(filter(lambda r: r.test.full_name != "no-op", commit.results))
 			if len(commit.results) == 0 and not hasattr(commit, 'annotation'):
 				continue
 
