@@ -79,10 +79,21 @@ parser.add_argument("-S", dest='remove_conf_script', help="Remove a configuratio
                     action="append")
 parser.add_argument("-a", dest='attributes', help="Set an attribute",
                     type=AttributeString, action="append", choices=SmartEzbench.attributes())
+parser.add_argument("-l", dest='list_tests', help="List the available benchmarks",
+                    action="store_true")
 parser.add_argument("report_name", nargs='?')
 parser.add_argument("command", help="Command to execute", nargs='?',
                     choices=('start', 'run', 'pause', 'abort', 'status'))
 args = parser.parse_args()
+
+if args.list_tests:
+    ezbench = Ezbench(ezbench_dir=ezbench_dir)
+    tests = ezbench.available_tests()
+
+    for test in sorted(tests):
+        print(test)
+
+    sys.exit(0)
 
 if args.list_testsets:
     testsets = Testset.list(ezbench_dir)
