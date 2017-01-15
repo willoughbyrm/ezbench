@@ -36,7 +36,7 @@ import shutil
 import sys
 import os
 
-ezbench_dir = os.path.dirname(os.path.abspath(__file__))
+ezbench_dir = os.path.dirname(os.path.realpath(__file__))
 
 sys.path.append(os.path.join(ezbench_dir, 'python-modules'))
 
