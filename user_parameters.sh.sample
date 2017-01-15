@@ -50,7 +50,7 @@ REPO_XF86_VIDEO_INTEL_PARAMETERS="--prefix=\$REPO_XF86_VIDEO_INTEL_PREFIX \
 REPO_XF86_VIDEO_INTEL_XORG_CONF_TEMPLATE="$ezBenchDir/confs.d/xf86-video-intel-template.conf"
 
 # folder that will receive the different builds
-DEPLOY_BASE_DIR=$ezBenchDir/builds
+DEPLOY_BASE_DIR="$HOME/.ezbench/builds"
 
 # Libraries options
 LIBFRAMETIME64_SO=/usr/lib/libframetime.so

@@ -400,7 +400,7 @@ profile_repo_check
 display_repo_info
 
 # Generate the logs folder path
-logsFolder="~/.ezbench/reports/${reportName:-$(date +"%Y-%m-%d-%T")}"
+logsFolder="$HOME/.ezbench/reports/${reportName:-$(date +"%Y-%m-%d-%T")}"
 
 # Write in the journal that the version is deployed (even in dry-run mode)
 deployed_version=$(profile_repo_version_from_human $(profile_repo_deployed_version))
