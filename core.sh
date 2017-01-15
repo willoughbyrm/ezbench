@@ -34,6 +34,7 @@
 #   Core Ezbench:
 #       - 0: No errors, the execution ran as expected
 #       - 1: Unknown error
+#       - 2: Missing configuration file
 #       - 5: An instance of core.sh is already running
 #       - 6: The report is locked
 #
@@ -223,8 +224,20 @@ function show_help {
     echo "        -L: List the already-built versions (requires -P)"
 }
 
+function source_parameters {
+    source "$HOME/.ezbench/ezbench.conf" && return 0
+    source "/etc/ezbench.conf" && return 0
+    source "$ezBenchDir/ezbench.conf" && return 0
+
+    # For backward compatibility
+    source "$ezBenchDir/user_parameters.sh" && return 0
+
+    echo "Could not find a suitable configuration file for ezbench. Aborting..."
+    exit 2
+}
+
 # Read the user parameters
-source "$ezBenchDir/user_parameters.sh"
+source_parameters 2> /dev/null
 
 # First find the profile, if it is set
 optString="h?P:p:n:N:H:r:b:B:m:T:lLkc:"

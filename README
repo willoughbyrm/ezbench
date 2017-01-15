@@ -64,9 +64,15 @@ install the following applications:
 
 === Configuration ===
 
-The tests configuration file is named user_parameters.sh. A sample file called
-user_parameters.sh.sample comes with the repo and is a good basis for your first
-configuration file.
+The tests configuration file is named ezbench.conf and will be looked up in the
+following order:
+
+ - $HOME/.ezbench/
+ - /etc/
+ - same folder as core.sh
+
+A sample file called ezbench.conf.sample comes with the repo and is a good basis
+for your first configuration file.
 
 You will need to adjust this file to give the location of the base directory of
 all the benchmark folders and repositories for the provided profiles.
