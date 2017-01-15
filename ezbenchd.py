@@ -182,7 +182,7 @@ def setup_http_server(bind_ip = "0.0.0.0", port = 8080):
             if extension in content_types:
                 content_type = content_types[extension]
 
-            chroot_folder = "{}/logs/{}".format(ezbench_dir, report_name)
+            chroot_folder = Ezbench.report_folder(ezbench_dir, report_name)
             path = "{}/{}".format(chroot_folder, filename)
             real_path = os.path.realpath(path)
             if real_path.startswith(chroot_folder):
@@ -334,7 +334,7 @@ def sbench_run(report_name):
     # Generate an HTML with the report returned by schedule_enhancements
     clock_start = time.clock()
     compare_reports.reports_to_html([report],
-                                    "{}/logs/{}/index.html".format(ezbench_dir, sbench.report_name),
+                                    "{}/index.html".format(Ezbench.report_folder(ezbench_dir, sbench.report_name)),
                                     output_unit = "fps",
                                     commit_url = sbench.commit_url(),
                                     verbose = False,

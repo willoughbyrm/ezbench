@@ -178,7 +178,7 @@ class SmartEzbench:
         self.readonly = readonly
         self.ezbench_dir = ezbench_dir
         self.report_name = report_name
-        self.log_folder = ezbench_dir + '/logs/' + report_name
+        self.log_folder = Ezbench.report_folder(ezbench_dir, report_name)
         self.hook_binary_path = hook_binary_path
         self.smart_ezbench_state = self.log_folder + "/smartezbench.state"
         self.smart_ezbench_lock = self.log_folder + "/smartezbench.lock"

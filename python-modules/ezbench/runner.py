@@ -83,15 +83,21 @@ class Ezbench:
         self.tests_folder = tests_folder
         self.run_config_scripts = run_config_scripts
 
-        self.abortFileName = None
-        if report_name is not None:
-            self.abortFileName = "{}/logs/{}/requestExit".format(ezbench_dir, report_name)
+    @classmethod
+    def report_folder(cls, ezbench_dir, report_name):
+        return "{}/logs/{}/".format(ezbench_dir, report_name)
 
     @classmethod
-    def requestEarlyExit(self, ezbench_dir, report_name):
-        abortFileName = "{}/logs/{}/requestExit".format(ezbench_dir, report_name)
+    def early_exit_file(cls, ezbench_dir, report_name):
+        if ezbench_dir is not None and report_name is not None:
+            return "{}/requestExit".format(cls.report_folder(ezbench_dir, report_name))
+        else:
+            return None
+
+    @classmethod
+    def requestEarlyExit(cls, ezbench_dir, report_name):
         try:
-            f = open(abortFileName, 'w')
+            f = open(cls.early_exit_file(ezbench_dir, report_name), 'w')
             f.close()
             return True
         except IOError:
@@ -151,9 +157,10 @@ class Ezbench:
 
         # Remove the abort file before running anything as it would result in an
         # immediate exit
-        if not dry_run and self.abortFileName is not None:
+        abortFileName = self.early_exit_file(self.ezbench_dir, self.report_name)
+        if not dry_run and abortFileName is not None:
             try:
-                os.remove(self.abortFileName)
+                os.remove(abortFileName)
             except FileNotFoundError:
                 pass
 
@@ -227,7 +234,7 @@ class Ezbench:
         if self.report_name is None:
             return False
 
-        lockFileName = "{}/logs/{}/lock".format(self.ezbench_dir, self.report_name)
+        lockFileName = "{}/lock".format(self.report_folder(self.ezbench_dir, self.report_name))
 
         try:
             with open(lockFileName, 'w') as lock_fd:

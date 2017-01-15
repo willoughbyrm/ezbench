@@ -65,8 +65,7 @@ def create_new_commit(repo, ref, template, state):
 
 def report_cleanup(report_name):
 	try:
-		shutil.rmtree('{ezbench_dir}/logs/{name}'.format(ezbench_dir=ezbench_dir,
-                                                         name=report_name))
+		shutil.rmtree(Ezbench.report_folder(ezbench_dir, report_name))
 	except FileNotFoundError as e:
 		print(e)
 		pass
