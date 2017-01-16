@@ -40,7 +40,7 @@ function db_get_file() {
     sha1_db=$1
     sha1=$2
 
-    echo "$sha1_db/db/$sha1"
+    echo "$HOME/.ezbench/SHA1_DB/$sha1"
 }
 
 function db_add() {
