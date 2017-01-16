@@ -125,7 +125,7 @@ function profile_get_version_list() {
 # Outputs:
 #   - Space-separated list of versions
 function profile_get_built_versions() {
-    pushd  $PROFILE_DEPLOY_BASE_DIR > /dev/null || return 1
+    pushd  "$PROFILE_DEPLOY_BASE_DIR" 2>&1 > /dev/null || return 1
     for file in *; do
         echo -n "$file "
     done
