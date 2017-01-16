@@ -36,7 +36,15 @@ import os
 
 class TimingsDB:
     def __init__(self, base_folder):
-        self.db_file_name = base_folder + '/db.json'
+        self.db_file_name = os.path.expanduser("~/.ezbench/Timing_DB/db.json")
+
+        # make sure the parent directory exists
+        try:
+            os.makedirs(os.path.dirname(self.db_file_name))
+        except FileExistsError as e:
+            pass
+
+        # open the file
         try:
             with open(self.db_file_name) as data_file:
                 fcntl.flock(data_file, fcntl.LOCK_EX)
