@@ -1,34 +1,6 @@
 test -e "$REPO_PIGLIT/piglit" || return 1
 
-function __piglit_run__ {
-    cd "$REPO_PIGLIT"
-
-    local test_name=${testNames[$t]}
-    local backend=$1
-    local testscript=$2
-
-    # Sub tests
-    local has_subtests=0
-    local testlist=''
-    testlistfile="${run_log_file}.testlist"
-    rm "$testlistfile"
-    for subtest in "${run_sub_tests[@]}"; do
-        echo "$subtest" | cut -d '<' -f 1 >> $testlistfile
-        has_subtests=1
-    done
-    [ $has_subtests -eq 1 ] && testlist="--test-list $testlistfile"
-
-    piglit_output=${run_log_file}_tmp
-
-    # start piglit
-    local cmdline="$REPO_PIGLIT/piglit run -p $backend $PIGLIT_RUN_PARAMS $testlist $testscript ${piglit_output}"
-    hash xterm && cmdline="xterm -geometry +0+300 -e 'echo $cmdline; $cmdline'"
-
-    ENV_DUMP_REQUIRE_ARGUMENT="$REPO_PIGLIT/piglit" \
-    ENV_DUMP_NO_METRICS=1 \
-    run_bench 0 $cmdline > /dev/null 2> /dev/null
-    local exit_code=$?
-
+function __piglit_gen_report__ {
     # generate a report, first print the passrate on the first line, then print the individual results
     python3 - 2> ${run_log_file}.processing_stderr << END
 import traceback
@@ -82,6 +54,75 @@ END
 
     # delete the temporary report
     rm -rf ${piglit_output} 2>&1
+}
+
+function __piglit_resume__ {
+    cd "$REPO_PIGLIT"
+
+    # ignore the incomplete result to avoid being stuck in a loop
+    local cmdline="$REPO_PIGLIT/piglit resume -n ${run_log_file}_tmp"
+
+    # Start the debug console
+    if hash xterm; then
+        xterm -geometry +0+300 -e "echo $cmdline; tail -F \"$run_log_file.stdout\""&
+        xterm_pid=$!
+    fi
+
+    ENV_DUMP_RESTRICT_TO_BINARY="NO_ENVDUMP_PLEASE"
+    $cmdline >> "$run_log_file.stdout" 2>> "$run_log_file.stderr"
+    local exit_code=$?
+
+    # Kill the debug console
+    [ -n "$xterm_pid" ] && kill $xterm_pid
+
+    if [ $exit_code -ne 0 ]; then
+        __piglit_resume__
+    else
+        __piglit_gen_report__
+    fi
+}
+
+function __piglit_run__ {
+    cd "$REPO_PIGLIT"
+
+    local test_name=${testNames[$t]}
+    local backend=$1
+    local testscript=$2
+
+    # Sub tests
+    local has_subtests=0
+    local testlist=''
+    testlistfile="${run_log_file}.testlist"
+    rm "$testlistfile"
+    for subtest in "${run_sub_tests[@]}"; do
+        echo "$subtest" | cut -d '<' -f 1 >> $testlistfile
+        has_subtests=1
+    done
+    [ $has_subtests -eq 1 ] && testlist="--test-list $testlistfile"
+
+    # start piglit. Use the sync mode to make the resume more reliable
+    piglit_output=${run_log_file}_tmp
+    local cmdline="$REPO_PIGLIT/piglit run -p $backend $PIGLIT_RUN_PARAMS -s $testlist $testscript ${piglit_output}"
+
+    # Start the debug console
+    if hash xterm; then
+        xterm -geometry +0+300 -e "echo $cmdline; tail -F \"$run_log_file.stdout\""&
+        xterm_pid=$!
+    fi
+
+    ENV_DUMP_REQUIRE_ARGUMENT="$REPO_PIGLIT/piglit" \
+    ENV_DUMP_NO_METRICS=1 \
+    run_bench 0 $cmdline > /dev/null 2> /dev/null
+    local exit_code=$?
+
+    # Kill the debug console
+    [ -n "$xterm_pid" ] && kill $xterm_pid
+
+    if [ $exit_code -ne 0 ]; then
+        __piglit_resume__
+    else
+        __piglit_gen_report__
+    fi
 }
 
 backends=$($REPO_PIGLIT/piglit run -h | grep "^  -p" | cut -d '{' -f 2 | cut -d '}' -f 1 | tr ',' ' ')
