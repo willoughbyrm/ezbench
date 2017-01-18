@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (c) 2015, Intel Corporation
+# Copyright (c) 2015-2017, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -422,6 +422,17 @@ function execute_test {
         "$execFuncName" > "$run_log_file" 2> /dev/null
     fi
     local exit_code=$?
+    if [ "$testHasExitCode" -eq 1 ]; then
+        # If the testing requested a reboot etc, we don't really want to mark it
+        # as completely tested. The exit codes signaling a completed test are
+        # 0 (no error) and 19 (already complete).
+        if [ ! "$exit_code" -eq 0 && ! "$exit_code" -eq 19 ]; then
+            callIfDefined benchmark_run_post_hook
+            callIfDefined "$postHookFuncName"
+            return "$exit_code"
+        fi
+    fi
+
     write_to_journal tested "$version" "${testName}" "$run_log_file_name"
 
     callIfDefined benchmark_run_post_hook
