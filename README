@@ -7,11 +7,13 @@ patch-series.
 
 WIP
 
-== Core.sh ==
+== Runner.sh / Core.sh ==
 
 WARNING: This tool can be used directly from the CLI but it is recommenced that
 you use ezbench in conjunction with ezbenchd which together support testing
 kernels and which can recover upon errors.
+
+WARNING 2: core.sh is now considered deprecated
 
 This tool is responsible for collecting the data and generating logs that will
 be used by another tool to generate a visual report.
@@ -82,7 +84,7 @@ for example allows users to specify which compositor should be used.
 If core.sh is currently running and you want to stop its execution after the next
 test, you can create a file named 'requestExit' in the log folder.
 
-=== Examples ===
+=== Core.sh examples ===
 
 ==== Testing every patchset of a series ====
 

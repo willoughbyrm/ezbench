@@ -25,6 +25,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
+from datetime import datetime
 from enum import Enum
 import subprocess
 import fcntl
@@ -245,3 +246,231 @@ class Ezbench:
         except Exception:
             return False
             pass
+
+
+class RunnerErrorCode(Enum):
+    UNKNOWN = -1
+    NO_ERROR = 0
+    UNKNOWN_ERROR = 1
+    CORE_ALREADY_RUNNING = 5
+    REPORT_LOCKED = 6
+
+    CMD_INVALID = 10
+    CMD_PARAMETER_ALREADY_SET = 11
+    CMD_PROFILE_INVALID = 12
+    CMD_PROFILE_MISSING = 13
+    CMD_REPORT_CREATION = 14
+    CMD_REPORT_MISSING = 15
+    CMD_TESTING_NOT_STARTED = 16
+    CMD_TEST_EXEC_TYPE_UNSUPPORTED = 17
+    CMD_TEST_EXEC_TYPE_NEED_VALID_RESULT_FILE = 18
+    CMD_RESULT_ALREADY_COMPLETE = 19
+
+    OS_SHELL_GLOBSTAT_MISSING = 30
+    OS_LOG_FOLDER_CREATE_FAILED = 31
+    OS_CD_REPO = 32
+
+    GIT_INVALID_COMMIT_ID = 50
+
+    ENV_SETUP_ERROR = 60
+
+    COMP_DEP_UNK_ERROR = 70
+    COMPILATION_FAILED = 71
+    DEPLOYMENT_FAILED = 72
+    DEPLOYMENT_ERROR = 73
+    REBOOT_NEEDED = 74
+
+    EARLY_EXIT = 80
+
+    TEST_INVALID_NAME = 100
+
+class RunnerError(Exception):
+    pass
+
+class RunnerTest:
+    def __init__(self, name, test_type, unit, inverted, time_estimation):
+        """
+        Construct a RunnerTest, which contains information about a runner.sh
+        test.
+
+        Args:
+            name: The name of the test (for example: glxgears:window)
+            test_type: The type of the test (for example: unified)
+            unit: The unit used by the test (for example: FPS). Only applicable
+                  to the non-unified test types.
+            inverted: True if lower is better, False otherwise. Only applicable
+                  to the non-unified test types.
+            time_estimation: Very rough estimation of how long the test may run.
+        """
+        self.name = name
+        self.test_type = test_type
+        self.unit = unit
+        self.inverted = inverted
+        self.time_estimation = time_estimation
+
+    def __str__(self):
+        return self.name
+
+class RunnerCmdResult:
+    def __init__(self, cmd, timestamp, err_code, err_str, exec_time, cmd_output):
+        """
+        Construct a RunnerCmdResult, which contains information about the
+        execution of a command by
+
+        Args:
+            cmd: The command sent to runner.sh
+            timestamp: Time at which the command has been sent
+            err_code: Error code returned by the command. It is an instance of
+                      a RunnerErrorCode
+            err_str: String representing the error
+            exec_time: Exact execution time of the command
+            cmd_output: Output of the command
+        """
+        self.cmd = cmd
+        self.timestamp = timestamp
+        self.err_code = err_code
+        self.err_str = err_str
+        self.exec_time = exec_time
+        self.cmd_output = cmd_output
+
+class Runner:
+    def __init__(self, ezbench_dir):
+        """
+        Construct an ezbench Runner.
+
+        Args:
+            ezbench_dir: Absolute path to the ezbench directory
+        """
+        self.ABI = 1
+        self.ezbench_dir = ezbench_dir
+        self.runner_path = "{}/runner.sh".format(ezbench_dir)
+
+        # Start the runner!
+        self.runner = subprocess.Popen([self.runner_path], stdin=subprocess.PIPE, stdout=subprocess.PIPE, universal_newlines=True)
+
+        runner_version = self.version()
+        if runner_version != self.ABI:
+            raise ValueError("The runner implements a different version ({}) than we do ({})".format(runner_version, self.ABI))
+
+    def __del__(self):
+        self.done()
+
+    def __send_command__(self, cmd):
+        """
+        Execute a command in the current runner, generate an exception if it
+        does not execute properly.
+
+        Returns a RunnerCmdResult object
+
+        Args:
+            cmd: The command to execute
+        """
+        if self.runner is None:
+            return
+
+        # Send the wanted command
+        timestamp = datetime.now()
+        self.runner.stdin.write(cmd + "\n")
+        self.runner.stdin.flush()
+
+        # Read the output
+        cmd_output = []
+        for line in self.runner.stdout:
+            fields = line.rstrip().split(',')
+            if fields[0] == "-->":
+                pass
+            elif fields[0] == "<--":
+                useless, errno, errstr, time = fields
+
+                exec_time = float(time.split(' ')[0]) / 1000.0
+                err_code = RunnerErrorCode(int(errno))
+                if err_code != RunnerErrorCode.NO_ERROR:
+                    msg="The runner returned the error code {} ({}) for the command '{}'"
+                    raise RunnerError(dict({"msg":msg.format(errno, errstr, cmd),
+                                            "err_code":err_code, "err_str":errstr}))
+
+                return RunnerCmdResult(cmd, timestamp, err_code, errstr,
+                                       exec_time, cmd_output)
+            else:
+                cmd_output.append(line.rstrip())
+
+    def __parse_cmd_output__(self, cmd_output):
+        state = dict()
+        for line in cmd_output:
+            fields = line.split("=")
+            if len(fields) == 2:
+                state[fields[0]] = fields[1]
+        return state
+
+    def conf_script(self):
+        errno, errstr, time, cmd_output = self.__send_command__("conf_script")
+        return cmd_output
+
+    def add_conf_script(self, path):
+        self.__send_command__("conf_script,{}".format(path))
+
+    def done(self):
+        if self.runner is not None:
+            self.__send_command__("done")
+            self.runner.wait()
+            self.runner = None
+
+    def list_cached_versions(self):
+        r = self.__send_command__("list_cached_versions")
+        return r.cmd_output
+
+    def list_tests(self):
+        r = self.__send_command__("list_tests")
+
+        tests=[]
+        for t in r.cmd_output:
+            name, test_type, unit, inverted, time_estimation = t.split(',')
+            tests.append(RunnerTest(name, test_type, unit,
+                                    (inverted == "1"), time_estimation))
+
+        return tests
+
+    def profile(self):
+        r = self.__send_command__("profile")
+        return r.cmd_output[0]
+
+    def set_profile(self, profile):
+        self.__send_command__("profile,{}".format(profile))
+
+    def reboot(self):
+        self.__send_command__("reboot")
+
+    def repo_info(self):
+        r = self.__send_command__("repo")
+        return self.__parse_cmd_output__(r.cmd_output)
+
+    def report_name(self):
+        r = self.__send_command__("report")
+        return r.cmd_output[0]
+
+    def set_report_name(self, report):
+        self.__send_command__("report,{}".format(report))
+
+    def resume(self, commit, test, result_file, verbose):
+        if verbose:
+            verbose = 1
+        else:
+            verbose = 0
+        cmd = "resume,{},{},{},{}".format(commit, test, result_file, verbose)
+        r = self.__send_command__(cmd)
+        return r.exec_time, r.cmd_output[0]
+
+    def run(self, commit, test, verbose):
+        if verbose:
+            verbose = 1
+        else:
+            verbose = 0
+        r = self.__send_command__("run,{},{},{}".format(commit, test, verbose))
+        return r.exec_time, r.cmd_output[0]
+
+    def start_testing(self):
+        self.__send_command__("start_testing")
+
+    def version(self):
+        r = self.__send_command__("version")
+        return int(r.cmd_output[0])
