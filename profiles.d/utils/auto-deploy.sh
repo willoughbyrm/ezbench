@@ -117,9 +117,12 @@ function auto_deploy_make_and_deploy() {
             fi
         else
             echo "$(date +"%m-%d-%Y-%T"): Commit marked as broken. Remove '$broken_commit_file' if this is incorrect."
+
+            local compile_error=72
         fi
     else
         echo "$(date +"%m-%d-%Y-%T"): Found a cached version of the compilation, re-use it!"
+        local compile_error=0
     fi
 
     # Call the user-defined post-compile hook
