@@ -392,3 +392,10 @@ function opengl_version() {
     out=$(glxinfo 2> /dev/null | grep "OpenGL core profile version string:" | cut -d : -f 2 | cut -d ' ' -f 2-)
     [ -n "$out" ] && __opengl_clean_version__ "$out" && return 0
 }
+
+function are_same_versions {
+    local v1=$(profile_repo_version_from_human $1)
+    local v2=$(profile_repo_version_from_human $2)
+    [[ "$v1" == "$v2" ]]
+    return $?
+}

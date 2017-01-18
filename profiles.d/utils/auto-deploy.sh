@@ -67,7 +67,7 @@ function auto_deploy_make_and_deploy() {
     local depl_version=$(profile_repo_deployed_version)
 
     # If we did not get the expected version, let's compile it
-    if [[ "$depl_version" != "$version" ]]; then
+    if ! are_same_versions "$version" "$depl_version"; then
         # Verify that the commit is not marked as broken
         local dep_version_dir=$(profile_repo_deployment_version_dir)
         local broken_commit_file="$dep_version_dir/ezbench_marked_broken"
@@ -107,7 +107,7 @@ function auto_deploy_make_and_deploy() {
                 # wanted one and, if not, say the deployment failed.
                 if [[ $compile_error -eq 0 ]]; then
                     local depl_version=$(profile_repo_deployed_version)
-                    if [[ "$depl_version" != "$version" ]]; then
+                    if ! are_same_versions "$version" "$depl_version"; then
                         local compile_error=72
 
                         # Mark the commit as broken, to avoid recompilations
