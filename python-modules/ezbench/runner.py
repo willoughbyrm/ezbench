@@ -394,6 +394,10 @@ class Runner:
             else:
                 cmd_output.append(line.rstrip())
 
+        raise RunnerError(dict({"msg":"Incomplete command:\n{}".format(cmd_output),
+                                "err_code":RunnerErrorCode.UNKNOWN,
+                                "err_str":"Stream ended before we got '<--'"}))
+
     def __parse_cmd_output__(self, cmd_output):
         state = dict()
         for line in cmd_output:

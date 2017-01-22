@@ -300,17 +300,21 @@ class SmartEzbench:
             self.__log(Criticality.EE, "Could not dump the current state to a file!")
             return False
 
-    def __create_ezbench(self, ezbench_path = None, profile = None, report_name = None):
+    def __create_ezbench(self, ezbench_path = None, profile = None):
         """
         WARNING: The state mutex must be taken!
         """
+        runner = Runner(self.ezbench_dir)
+        runner.set_report_name(self.report_name)
+
         if profile is None:
             profile = self.__read_attribute_unlocked__('profile')
+        runner.set_profile(profile)
 
-        conf_scripts = self.__read_attribute_unlocked__('conf_scripts', [])
-        return Ezbench(ezbench_dir = self.ezbench_dir, profile = profile,
-                       report_name = self.report_name,
-                       run_config_scripts = conf_scripts)
+        for conf_script in self.__read_attribute_unlocked__('conf_scripts', []):
+            runner.add_conf_script(conf_script)
+
+        return runner
 
     def __read_attribute_unlocked__(self, attr, default = None):
         if attr in self.state:
@@ -383,21 +387,22 @@ class SmartEzbench:
         self.__reload_state(keep_lock=True)
         if 'beenRunBefore' not in self.state or self.state['beenRunBefore'] == False:
             # Check that the profile exists!
-            ezbench = self.__create_ezbench(profile = profile)
-            run_info = ezbench.run(["HEAD"], [], [], dry_run=True)
-            if not run_info.success():
-                if run_info.exit_code == EzbenchExitCode.ARG_PROFILE_INVALID:
+            try:
+                runner = self.__create_ezbench(profile=profile)
+
+                self.state['profile'] = profile
+                self.__log(Criticality.II, "Ezbench profile set to '{profile}'".format(profile=profile))
+                self.__save_state()
+            except RunnerError as e:
+                if e.args['err_code'] == RunnerErrorCode.ARG_PROFILE_INVALID:
                     self.__log(Criticality.EE,
-                               "Invalid profile name '{profile}'.".format(profile=profile))
+                               "Invalid profile name '{}'.".format(profile))
                 else:
                     self.__log(Criticality.EE,
-                               "The following error arose '{error}'.".format(error=run_info.exit_code.name))
-                self.__release_lock()
-                return
-
-            self.state['profile'] = profile
-            self.__log(Criticality.II, "Ezbench profile set to '{profile}'".format(profile=profile))
-            self.__save_state()
+                               "The following error arose '{}({})'.".format(e.args['err_code'],
+                                                                            e.args['err_str']))
+            finally:
+                del runner
         else:
             self.__log(Criticality.EE, "You cannot change the profile of a report that already has results. Start a new one.")
         self.__release_lock()
@@ -540,8 +545,8 @@ class SmartEzbench:
         db = TimingsDB(self.ezbench_dir + "/timing_DB")
 
         # Get information about the build time and the available versions
-        ezbench = self.__create_ezbench()
-        versions = set(ezbench.available_versions())
+        runner = self.__create_ezbench()
+        versions = set(runner.list_cached_versions())
         c_ts = db.data("build", self.profile())
         if len(c_ts) > 0:
             c_t = statistics.median(c_ts)
@@ -614,9 +619,11 @@ class SmartEzbench:
         self.__release_lock()
         return ret
 
-    def __done_running__(self):
+    def __done_running__(self, runner):
         self._task_current = None
         self._task_list = None
+
+        runner.done()
 
         # Call the hook file, telling we are done running
         self.__call_hook__('done_running_tests')
@@ -711,10 +718,10 @@ class SmartEzbench:
 
         self.__log(Criticality.II, "    - Configuration scripts: '{0}'".format(self.conf_scripts()))
 
-        # Create the ezbench runner
-        ezbench = self.__create_ezbench()
-        run_info = ezbench.run(["HEAD"], [], [], dry_run=True)
-        deployed_commit = self.repo().full_version_name(run_info.deployed_commit)
+        # Create the runner
+        runner = self.__create_ezbench()
+        repo_infos = runner.repo_info()
+        deployed_commit = repo_infos["deployed_version"]
         self.__log(Criticality.II, "    - Deployed version: '{0}'".format(deployed_commit))
         self.__log(Criticality.II, "All the dependencies are met, generate a report...")
 
@@ -744,13 +751,16 @@ class SmartEzbench:
         # Call the hook file, telling we started running
         self.__call_hook__('start_running_tests')
 
-        # Start generating ezbench calls
+        # Setup the test environment
+        runner.start_testing()
+
+        # Start generating runner calls
         while len(self._task_list) > 0:
             running_mode = self.running_mode(check_running = False)
             if running_mode != RunningMode.RUN:
                 self.__log(Criticality.II,
                        "Running mode changed from RUN(NING) to {mode}. Exit...".format(mode=running_mode.name))
-                self.__done_running__()
+                self.__done_running__(runner)
                 return False
 
             self._task_current = e = self._task_list.pop(0)
@@ -760,10 +770,8 @@ class SmartEzbench:
                                                                                                   commit=e.commit,
                                                                                                   test=short_name))
 
-            # Until we can read the output of core.sh on the fly, let's update
-            # the timings for the current task by emulating what EzBench does
-            ezbench = self.__create_ezbench()
-            versions = set(ezbench.available_versions())
+            # Get information about how long this task will take!
+            versions = set(runner.list_cached_versions())
             db = TimingsDB(self.ezbench_dir + "/timing_DB")
             build_times = db.data("build", self.profile())
             if len(build_times) > 0:
@@ -774,27 +782,28 @@ class SmartEzbench:
 
             # Start the task
             self._task_current.started()
-            self._task_lock.release()
-            run_info = ezbench.run([e.commit], [e.test + '$'], rounds=e.rounds)
-            self._task_lock.acquire()
-
-            if run_info.success():
-                continue
-
-            # We got an error, let's see what we can do about it!
-            if run_info.exit_code.value < 40:
-                # Error we cannot do anything about, probably a setup issue
-                # Let's mark the run as aborted until the user resets it!
-                self.__log(Criticality.EE, "The run returned the error {}".format(run_info.exit_code))
-                self.set_running_mode(RunningMode.ERROR)
-            elif (run_info.exit_code == EzbenchExitCode.COMPILATION_FAILED or
-                  run_info.exit_code == EzbenchExitCode.DEPLOYMENT_FAILED):
-                # Cancel any other test on this commit
-                self._task_list = [x for x in self._task_list if not x.commit == e.commit]
+            for r in range(0, e.rounds):
+                self._task_lock.release()
+                try:
+                    time, cmd_output = runner.run(e.commit, e.test, False)
+                except RunnerError as error:
+                    err_code = error.args[0]['err_code']
+                    # We got an error, let's see what we can do about it!
+                    if (err_code.value != RunnerErrorCode.NO_ERROR and
+                        err_code.value < RunnerErrorCode.COMP_DEP_UNK_ERROR.value):
+                        # Error we cannot do anything about, probably a setup issue
+                        # Let's mark the run as aborted until the user resets it!
+                        self.__log(Criticality.EE, "The run returned the error {}".format(err_code))
+                        self.set_running_mode(RunningMode.ERROR)
+                    elif (err_code == RunnerErrorCode.COMPILATION_FAILED or
+                        err_code == RunnerErrorCode.DEPLOYMENT_FAILED):
+                        # Cancel any other test on this commit
+                        self._task_list = [x for x in self._task_list if not x.commit == e.commit]
+                self._task_lock.acquire()
 
         self._task_current = None
 
-        self.__done_running__()
+        self.__done_running__(runner)
         self.__log(Criticality.II, "Done")
 
         return True
@@ -802,13 +811,14 @@ class SmartEzbench:
     def repo(self):
         if not hasattr(self, "_cache_repo_"):
             # Get the repo directory
-            ezbench = self.__create_ezbench()
-            run_info = ezbench.run(["HEAD"], [], [], dry_run=True)
+            runner = self.__create_ezbench()
+            repo_infos = runner.repo_info()
+            deployed_commit = repo_infos["deployed_version"]
 
             self._cache_repo_ = None
-            if run_info.success() and run_info.repo_dir != '':
-                if run_info.repo_type == "git":
-                    self._cache_repo_ = GitRepo(run_info.repo_dir)
+            if repo_infos["path"] != '':
+                if repo_infos["type"] == "git":
+                    self._cache_repo_ = GitRepo(repo_infos["path"])
                     return self._cache_repo_
 
             # Default to no-repo

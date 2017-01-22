@@ -105,7 +105,7 @@ def parse_commit_title(title):
 	return int(f[0]), int(f[1]), f[2] == "True", f[3] == "True"
 
 def commit_info(commit):
-	return parse_commit_title(commit.full_name.split(' ')[1])
+	return parse_commit_title(commit.title)
 
 def check_commit_variance(actual, measured, max_variance):
 	return abs(actual - measured) < max_variance * actual
