@@ -122,7 +122,7 @@ for commit in report.commits:
 	# actual first sample!
 	if commit.full_name.endswith("template"):
 		continue
-	for result in commit.results:
+	for result in commit.results.values():
 		# Check that the results are for the right test
 		if result.test.full_name != 'perf_bisect':
 			continue
