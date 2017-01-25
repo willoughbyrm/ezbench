@@ -1341,6 +1341,9 @@ class Journal:
 
                         attrs["version"] = fields[2]
                         attrs["test"] = fields[3]
+
+                        if len(fields) > 4:
+                            attrs["result_file"] = fields[4]
                     else:
                         key=",".join(fields[2:])
 

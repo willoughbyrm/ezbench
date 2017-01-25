@@ -695,7 +695,8 @@ do
         benchSubtests="${testSubTests[$t]}"
 
         # Generate the logs file names
-        fps_logs=$logsFolder/${version}_${testType[$t]}_${testNames[$t]}
+        fps_logs_filename="${version}_${testType[$t]}_${testNames[$t]}"
+        fps_logs="$logsFolder/$fps_logs_filename"
         error_logs=${fps_logs}.errors
 
         # Find the first run id available
@@ -731,6 +732,7 @@ do
             # Exit if asked to
             [ -e "$abortFile" ] && continue
 
+            run_log_file_name="${fps_logs_filename}#$c"
             run_log_file="${fps_logs}#$c"
             IFS='|' read -a run_sub_tests <<< "$benchSubtests"
 
@@ -738,9 +740,9 @@ do
             callIfDefined benchmark_run_pre_hook
 
             # This function will return multiple fps readings
-            write_to_journal test "$version_full" "${testNames[$t]}"
+            write_to_journal test "$version_full" "${testNames[$t]}" "$run_log_file_name"
             "$runFuncName" > "$run_log_file" 2> /dev/null
-            write_to_journal tested "$version_full" "${testNames[$t]}"
+            write_to_journal tested "$version_full" "${testNames[$t]}" "$run_log_file_name"
 
             callIfDefined benchmark_run_post_hook
             callIfDefined "$postHookFuncName"
