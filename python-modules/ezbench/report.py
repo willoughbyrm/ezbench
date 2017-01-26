@@ -1662,12 +1662,12 @@ class Report:
         # all the results we have.
         overlay = self.overlay_graphs(scm)
 
-        # Compute the list of results we have adjacent with our parents in
-        # the overlay graph
+        # Compute the list of commits and set of results found on all the commits
         results = set()
-        for child in overlay.nodes():
-            for parent in overlay.parents(child):
-                results |= overlay.edge_results(parent, child)
+        commits_list = []
+        for commit in self.commits:
+            results |= commit.results_set()
+            commits_list.append(commit.full_sha1)
 
         # For all results, find what are the changes
         variance_cache = dict()
@@ -1676,7 +1676,7 @@ class Report:
             self.log("Analyse result {}/{}".format(count, len(results)), temporary=True)
             count += 1
 
-            bottom_leaves = set(overlay.nodes())
+            bottom_leaves = set(commits_list)
             for child in overlay.nodes():
                  # Skip if the result is not present on the current node
                 if result not in overlay.results(child):
