@@ -411,6 +411,7 @@ class GitRepo:
         """
 
         self.repo = pygit2.Repository(repo_path)
+        self._cached_merged_bases = dict()
 
     def full_version_name(self, version):
         """
@@ -521,17 +522,23 @@ class GitRepo:
             versions: the versions you want to have the merge base for
         """
 
-        # Find the merge base of all the versions
-        s = set(versions)
-        while len(s) > 1:
-            v1 = self.repo.revparse_single(s.pop()).oid
-            v2 = self.repo.revparse_single(s.pop()).oid
+        k = (frozenset(versions))
+        cached = self._cached_merged_bases.get(k, None)
+        if cached == None:
+            # Find the merge base of all the versions
+            s = set(versions)
+            while len(s) > 1:
+                v1 = self.repo.revparse_single(s.pop()).oid
+                v2 = self.repo.revparse_single(s.pop()).oid
 
-            v3 = self.repo.merge_base(v1, v2)
-            if v3 is not None:
-                s.add(str(v3))
+                v3 = self.repo.merge_base(v1, v2)
+                if v3 is not None:
+                    s.add(str(v3))
 
-        return s.pop()
+            cached = s.pop()
+            self._cached_merged_bases[k] = cached
+
+        return cached
 
     def subDAG(self, versions):
         """
