@@ -1329,25 +1329,26 @@ class Journal:
                         continue
 
                     # Parse the time
+                    attrs = dict()
                     try:
-                        timestamp = float(fields[0])
+                        attrs["timestamp"] = float(fields[0])
                     except:
                         continue
 
                     op = fields[1]
                     key=",".join(fields[2:])
 
-                    self.__add_value__(timestamp, op, key)
+                    self.__add_value__(op, key, attrs)
         except Exception:
             pass
 
-    def __add_value__(self, timestamp, op, key):
+    def __add_value__(self, op, key, attrs):
         if op not in self._journal:
             self._journal[op] = dict()
         if key not in self._journal[op]:
-            self._journal[op][key] = [timestamp]
+            self._journal[op][key] = [attrs]
         else:
-            self._journal[op][key].append(timestamp)
+            self._journal[op][key].append(attrs)
 
     def __key_test__(self, version, test_name):
         return "{},{}".format(version, test_name)
