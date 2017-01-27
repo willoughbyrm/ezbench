@@ -1336,7 +1336,13 @@ class Journal:
                         continue
 
                     op = fields[1]
-                    key=",".join(fields[2:])
+                    if op == "test" or op == "tested":
+                        key=",".join(fields[2:4])
+
+                        attrs["version"] = fields[2]
+                        attrs["test"] = fields[3]
+                    else:
+                        key=",".join(fields[2:])
 
                     self.__add_value__(op, key, attrs)
         except Exception:
