@@ -40,6 +40,13 @@ function profile_repo_version() {
     echo ""
 }
 
+# MANDATORY: Print the title of the version passed as a parameter
+# Inputs:
+#   - $repoDir
+function profile_repo_version_title() {
+    echo ""
+}
+
 # MANDATORY: Print the repo type
 # Inputs: None
 function profile_repo_type() {

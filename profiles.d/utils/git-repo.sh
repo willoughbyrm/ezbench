@@ -75,6 +75,18 @@ function profile_repo_version_to_human() {
     fi
 }
 
+# MANDATORY: Print the title of the version passed as a parameter
+# Inputs:
+#   - $repoDir
+function profile_repo_version_title() {
+    GIT_DIR="$repoDir/.git" git show --format="%s" -s "$1" 2> /dev/null
+    local ret=$?
+    if [ $ret -ne 0 ]; then
+        echo "<error>"
+        return $ret
+    fi
+}
+
 # MANDATORY: Print the full name of the version
 # Inputs:
 #   - $repoDir
