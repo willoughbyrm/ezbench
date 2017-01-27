@@ -345,7 +345,7 @@ class SmartEzbench:
 
     def running_mode(self, check_running = True):
         self.__reload_state(keep_lock=True)
-        ret = self.__running_mode_unlocked__()
+        ret = self.__running_mode_unlocked__(check_running)
         self.__release_lock()
         return ret
 
