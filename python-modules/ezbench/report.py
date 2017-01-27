@@ -1389,7 +1389,7 @@ class Journal:
                     continue
 
                 found = False
-                if "tested" in self._journal:
+                if "tested" in self._journal and key in self._journal["tested"]:
                     for tested_attrs in self._journal["tested"][key]:
                         if "result_file" not in tested_attrs:
                             continue
