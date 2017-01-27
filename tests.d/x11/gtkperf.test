@@ -6,7 +6,7 @@ test_invert=1
 hash gtkperf 2> /dev/null || return 1
 
 x11:gtkperf_run() {
-    run_bench 0 gtkperf -ac 1000 | grep --color=never "time: " | sed 's/\( -\)\? time: \+\(.*\)/: float(\2) s/g' | sed 's/ - /-/g'
+    run_bench 0 gtkperf -ac 1000 | grep --color=never "time: " | sed 's/\( -\)\? time: \+\(.*\)/: float(\2) s/g' | sed 's/ - /-/g' && echo ": str(completed)"
 }
 
 test_exec_time=5
