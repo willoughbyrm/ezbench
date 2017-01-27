@@ -1377,6 +1377,35 @@ class Journal:
     def tested_count(self, version, test_name):
         return self.count("tested", self.__key_test__(version, test_name))
 
+    def incomplete_tests(self):
+        if "test" not in self._journal:
+            return []
+
+        incomplete_tests = []
+        result_file_set = set()
+        for key in self._journal["test"]:
+            for test_attrs in self._journal["test"][key]:
+                if "result_file" not in test_attrs:
+                    continue
+
+                found = False
+                if "tested" in self._journal:
+                    for tested_attrs in self._journal["tested"][key]:
+                        if "result_file" not in tested_attrs:
+                            continue
+
+                        if test_attrs["result_file"] == tested_attrs["result_file"]:
+                            found = True
+                            break
+
+                # We did not find the same result file in the "tested" set,
+                # this means the run did not complete!
+                if not found and test_attrs["result_file"] not in result_file_set:
+                    incomplete_tests.append(test_attrs)
+                    result_file_set.add(test_attrs["result_file"])
+
+        return incomplete_tests
+
 class Report:
     def __init__(self, log_folder, silentMode = False, restrict_to_commits = []):
         self.log_folder = log_folder
