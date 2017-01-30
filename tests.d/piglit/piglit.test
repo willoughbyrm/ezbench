@@ -89,7 +89,6 @@ function __piglit_resume__ {
     fi
 
     __piglit_gen_report__
-    return 0
 }
 
 function __piglit_run__ {

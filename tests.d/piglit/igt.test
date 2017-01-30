@@ -1,5 +1,35 @@
 test -e "$REPO_PIGLIT/piglit" || return 1
 
+function __igt_resume__ {
+    cd "$REPO_PIGLIT"
+
+    # verify that the run is indeed resumable
+    local piglit_output="${run_log_file}_tmp"
+    [ -d "$piglit_output" ] || return 19
+
+    # Only try to resume if it is still possible to resume, otherwise, just
+    # generate the report
+    if [ -f "$piglit_output/metadata.json" ]; then
+        # ignore the incomplete result to avoid being stuck in a loop
+        local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $REPO_PIGLIT/piglit resume -n ${run_log_file}_tmp"
+
+        ENV_DUMP_RESTRICT_TO_BINARY="NO_ENVDUMP_PLEASE" \
+        $cmdline >> "$run_log_file.stdout" 2>> "$run_log_file.stderr"
+        local exit_code=$?
+
+        # piglit resume returns 1 if we try to resume a report that is already done
+        if [ $exit_code -ne 0 ]; then
+            __igt_resume__
+        fi
+    fi
+
+    # Make sure that the output folder is not root-owned
+    sudo chown -R "$(id -un):$(id -gn)" "$piglit_output"
+    __piglit_gen_report__
+
+    return 0
+}
+
 function __igt_run__ {
     cd "$REPO_PIGLIT"
 
@@ -17,61 +47,22 @@ function __igt_run__ {
     done
     [ $has_subtests -eq 1 ] && testlist="--test-list $testlistfile"
 
-    piglit_output=${run_log_file}_tmp
+    local piglit_output="${run_log_file}_tmp"
 
     # start piglit
-    local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $REPO_PIGLIT/piglit run $PIGLIT_RUN_PARAMS $parameters $testlist tests/igt.py ${piglit_output}"
+    local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $REPO_PIGLIT/piglit run $PIGLIT_RUN_PARAMS -s $parameters $testlist tests/igt.py ${piglit_output}"
 
     ENV_DUMP_REQUIRE_ARGUMENT="$REPO_PIGLIT/piglit" \
     ENV_DUMP_NO_METRICS=1 \
     run_bench 0 $cmdline > /dev/null 2> /dev/null
     local exit_code=$?
 
-    # generate a report, first print the passrate on the first line, then print the individual results
-    python3 - << END
-import sys
-import six
-
-sys.path.append("$PIGLIT_RUN_PARAMS")
-from framework import summary, status, core, backends, exceptions
-from framework.programs import parsers
-
-testrun = backends.load("${piglit_output}")
-
-tests=list()
-pass_count = 0
-for name, result in six.iteritems(testrun.tests):
-    for key, value in six.iteritems(result.subtests):
-        tests.append("{}<{}>: {}".format(name, key, value))
-        if value == 'pass':
-            pass_count += 1
-    tests.append("{}: {}".format(name, result.result))
-    if result.result == 'pass':
-        pass_count += 1
-
-print("{:.3f}".format(pass_count / len(tests)))
-for test in tests:
-    print(test)
-END
-
-    # Go through all the subtests we wanted to get and check if all of them
-    # are present. If not, mark them as missing.
-    for subtest in "${run_sub_tests[@]}"; do
-        grep "$subtest" "$run_log_file" 2> /dev/null > /dev/null
-        [ $? -eq 1 ] && echo "$subtest: missing"
-    done
-
-    # Display the final status, if it was a full run
-    if [ -z "${testSubTests[$t]}" ]; then
-        if [ "$exit_code" -eq 0 ]; then
-            echo ": completed"
-        else
-            echo ": incomplete"
-        fi
+    if [ $exit_code -ne 0 ]; then
+        __igt_resume__
+    else
+        sudo chown -R "$(id -un):$(id -gn)" "$piglit_output"
+        __piglit_gen_report__
     fi
-
-    # delete the temporary report
-    sudo rm -rf ${piglit_output} 2>&1
 }
 
 while read name parameters; do
@@ -109,10 +100,12 @@ for f in "$IGT_ROOT/tests/"**/*.testlist; do
 	_bn=$(basename $f)
 	_dn=$(basename $(dirname $f))
 	name="piglit:igt:${_dn}%${_bn%.testlist}"
-	eval "${name}_run() { __igt_run__ --test-list "$f" \$@; }"
+	eval "${name}_run() { __igt_run__ "" --test-list "$f" \$@; }"
+	eval "${name}_resume() { __igt_resume__; }"
 	test_name="$test_name $name"
 done
 
 test_unit="pass/total"
 test_type="unit"
 test_exec_time=600
+test_has_exit_code=1
