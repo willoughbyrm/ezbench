@@ -50,8 +50,12 @@ END
         echo ": completed"
     fi
 
-    # delete the temporary report
-    rm -rf "${piglit_output}" 2>&1
+    # delete or move the report
+    if [ "$PIGLIT_KEEP_REPORTS" -eq 1 ]; then
+        mv "${piglit_output}" "${run_log_file}_done"
+    else
+        rm -rf "${piglit_output}" 2>&1
+    fi
 
     return 0
 }

@@ -98,6 +98,7 @@ TESSERACT_FOLDER=/opt/benchmarks/tesseract
 
 # Piglit run parameters
 PIGLIT_RUN_PARAMS=''
+#PIGLIT_KEEP_REPORTS=1
 
 # PolyBench-ACC settings
 # https://github.com/cavazos-lab/PolyBench-ACC
