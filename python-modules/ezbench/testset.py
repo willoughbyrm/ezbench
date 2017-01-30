@@ -28,12 +28,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import os
 import re
 
-class Testset:
+class Testset(dict):
     def __init__(self, filepath, name):
         self.filepath = filepath
         self.name = name
         self.description = "No description"
-        self.tests = dict()
 
         self._ln = -1
 
@@ -60,7 +59,7 @@ class Testset:
         tests_added = 0
         for test in availableTestSet:
             if inc_re.search(test):
-                self.tests[test] = rounds
+                self[test] = rounds
                 tests_added += 1
 
         if tests_added == 0:
@@ -77,13 +76,13 @@ class Testset:
             self.__print__("invalid regular expression --> {}".format(e), silent)
 
         to_remove = []
-        for test in self.tests:
+        for test in self:
             if inc_re.search(test):
                 to_remove.append(test)
 
         if len(to_remove) > 0:
             for entry in to_remove:
-                del self.tests[entry]
+                del self[entry]
         else:
             self.__print__("exclude '{}' has no effect".format(reg_exp), silent)
 

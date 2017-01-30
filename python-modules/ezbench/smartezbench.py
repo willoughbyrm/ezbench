@@ -486,9 +486,12 @@ class SmartEzbench:
         else:
             rounds = int(rounds)
 
-        for test in sorted(testset.tests.keys()):
+        self.__log(Criticality.II, "Add the testset {} ({} tests)".format(testset.name,
+                                                                         len(testset)))
+
+        for test in sorted(testset.keys()):
             self.__add_test_unlocked__(commit, test,
-                                            testset.tests[test] * rounds)
+                                            testset[test] * rounds)
 
         self.__save_state()
         self.__release_lock()
