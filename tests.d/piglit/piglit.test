@@ -36,6 +36,8 @@ for test in tests:
     print(test)
 END
 
+    local exit_code=$?
+
     # Go through all the subtests we wanted to get and check if all of them
     # are present. If not, mark them as missing.
     for subtest in "${run_sub_tests[@]}"; do
@@ -44,7 +46,7 @@ END
     done
 
     # Display the final status, if it was a full run
-    if [ ! -f "${run_log_file}.testlist" ]; then
+    if [ "$exit_code" -eq 0 ] && [ ! -f "${run_log_file}.testlist" ]; then
         echo ": completed"
     fi
 
