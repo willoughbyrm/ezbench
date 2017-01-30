@@ -357,9 +357,10 @@ class SmartEzbench:
             Ezbench.requestEarlyExit(self.ezbench_dir, self.report_name)
 
         self.__write_attribute_unlocked__('mode', mode.value, allow_updates = True)
-        self.__log(Criticality.II, "Ezbench running mode set to '{mode}'".format(mode=mode.name))
 
         if mode != dsk_mode:
+            self.__log(Criticality.II, "Ezbench running mode set to '{mode}'".format(mode=mode.name))
+
             params = dict()
             params['ezbench_report_mode_prev'] = dsk_mode.name
             self.__call_hook__('mode_changed', params)
