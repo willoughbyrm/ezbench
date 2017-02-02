@@ -13,10 +13,6 @@
 
     % for c in events:
       <%
-        if (len(events[c]) == 1 and
-          list(events[c].keys())[0] == "variance"):
-          continue
-
         key = key + 1
         id = "events_" + str(key)
 
