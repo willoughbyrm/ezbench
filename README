@@ -149,6 +149,7 @@ do exist so you are sure that the work can be executed when the time comes.
 === Dependencies ===
 
  - python3
+ - dateutils
  - numpy
  - scipy
  - pygit2
