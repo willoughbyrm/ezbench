@@ -7,7 +7,7 @@ import traceback
 import sys
 import six
 
-sys.path.append("$PIGLIT_RUN_PARAMS")
+sys.path.append("$REPO_PIGLIT")
 from framework import summary, status, core, backends, exceptions
 from framework.programs import parsers
 
