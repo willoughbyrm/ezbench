@@ -101,19 +101,33 @@ class TaskEntry:
         self.exec_time = None
         self.build_time = None
 
+        self.cur_round = 1
+        self.last_round_completed_date = None
+
     def started(self):
         self.start_date = datetime.now()
 
+    def round_done(self):
+        self.cur_round += 1
+        self.last_round_completed_date = datetime.now()
+
     def predicted_completion_time(self):
-        b = 0
-        if self.build_time is not None:
-            b = self.build_time
+        if self.last_round_completed_date is None:
+            b = 0
+            if self.build_time is not None:
+                b = self.build_time
 
-        e = 0
-        if self.exec_time is not None:
-            e = self.exec_time
+            e = 0
+            if self.exec_time is not None:
+                e = self.exec_time
 
-        return timedelta(0, b + e)
+            return timedelta(0, b + e)
+        else:
+            # Use the current information to guess the exec time
+            time_diff = self.last_round_completed_date - self.start_date
+            avg_time_per_round = time_diff / (self.cur_round - 1)
+
+            return avg_time_per_round * self.rounds
 
     def set_timing_information(self, timingsDB, compilation_time = None,
                                available_versions = {}):
@@ -135,7 +149,13 @@ class TaskEntry:
 
     def __str__(self):
         if self.resumeResultFile is None:
-            string = "{}: {}: {} run(s)".format(self.commit, self.test, self.rounds)
+            if self.start_date is not None:
+                runs_str = "run [{}/{}]".format(self.cur_round, self.rounds)
+            else:
+                runs_str = "{} run(s)".format(self.rounds)
+
+            string = "{}: {}: {} ".format(self.commit, self.test, runs_str)
+
         else:
             string = "resume {}".format(self.resumeResultFile)
 
@@ -160,7 +180,9 @@ class TaskEntry:
                 string += "(estimated completion time: {}s)".format(rounded_total_delta)
         else:
             if self.start_date is not None:
-                string += "(started {} ago)".format(datetime.now() - self.start_date)
+                time = datetime.now() - self.start_date
+                rounded_time = timedelta(0, math.ceil(time.total_seconds()))
+                string += "(started {} ago)".format(rounded_time)
             else:
                 string += "(no estimation available)"
 
@@ -850,6 +872,8 @@ class SmartEzbench:
                           err_code == RunnerErrorCode.DEPLOYMENT_FAILED):
                         # Cancel any other test on this commit
                         self._task_list = deque([x for x in self._task_list if not x.commit == e.commit])
+
+                self._task_current.round_done()
 
         self._task_current = None
 
