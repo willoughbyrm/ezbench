@@ -968,11 +968,11 @@ class Commit:
             pass
 
         # Look for the exit code
-        self.compil_exit_code = EzbenchExitCode.UNKNOWN
+        self.compil_exit_code = RunnerErrorCode.UNKNOWN
         if report.journal.deployed_count(self.full_sha1) > 0:
-            self.compil_exit_code = EzbenchExitCode.NO_ERROR
+            self.compil_exit_code = RunnerErrorCode.NO_ERROR
         elif report.journal.deploy_count(self.full_sha1) > 1:
-            self.compil_exit_code = EzbenchExitCode.DEPLOYMENT_ERROR
+            self.compil_exit_code = RunnerErrorCode.DEPLOYMENT_ERROR
         else:
             # Last resort, try to inspect the compilation logs
             try:
@@ -982,14 +982,14 @@ class Commit:
                     # Line contains the last line of the report, parse it
                     s = "Exiting with error code "
                     if line.startswith(s):
-                        self.compil_exit_code = EzbenchExitCode(int(line[len(s):]))
+                        self.compil_exit_code = RunnerErrorCode(int(line[len(s):]))
             except Exception:
                 self.compile_log = None
                 pass
 
     def build_broken(self):
-        return (self.compil_exit_code.value >= EzbenchExitCode.COMP_DEP_UNK_ERROR.value and
-                self.compil_exit_code.value <= EzbenchExitCode.DEPLOYMENT_ERROR.value)
+        return (self.compil_exit_code.value >= RunnerErrorCode.COMP_DEP_UNK_ERROR.value and
+                self.compil_exit_code.value <= RunnerErrorCode.DEPLOYMENT_ERROR.value)
 
     def geom_mean(self):
         """ Returns the geometric mean of the average performance of all the
@@ -1579,7 +1579,7 @@ class Report:
 
                         # Add the result to the commit's results
                         commit.results[test.full_name] = result
-                        commit.compil_exit_code = EzbenchExitCode.NO_ERROR # The deployment must have been successful if there is data
+                        commit.compil_exit_code = RunnerErrorCode.NO_ERROR # The deployment must have been successful if there is data
                     except Exception as e:
                         traceback.print_exc(file=sys.stderr)
                         sys.stderr.write("\n")
@@ -1587,7 +1587,7 @@ class Report:
 
             # Add the information about the runtime and the commit to the list of commits
             # INFO: Do not add the commit if we got no meaningful results for it
-            if len(commit.results) > 0 or commit.compil_exit_code != EzbenchExitCode.UNKNOWN:
+            if len(commit.results) > 0 or commit.compil_exit_code != RunnerErrorCode.UNKNOWN:
                 result = TestResult(commit, ezbench_runner, "commit_result", None, None, None)
                 commit.results[result.test.full_name] = result
                 self.commits.append(commit)

@@ -172,7 +172,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 					db["commits"][commit.label]['build_color'] = "#00FF00"
 				else:
 					db["commits"][commit.label]['build_color'] = "#FF0000"
-				db["commits"][commit.label]['build_error'] = str(EzbenchExitCode(commit.compil_exit_code)).split('.')[1]
+				db["commits"][commit.label]['build_error'] = str(RunnerErrorCode(commit.compil_exit_code)).split('.')[1]
 			db["commits"][commit.label]['reports'][report.name] = dict()
 
 			# Add the results and perform some stats
