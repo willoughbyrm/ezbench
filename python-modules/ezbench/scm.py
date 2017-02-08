@@ -203,9 +203,11 @@ class ResultsDAG:
         out = "digraph {\n"
         for p in self._children:
             for c in self.children(p):
-                out += "    \"{}\" -> \"{}\"[label=\"{}\"];\n".format(self.__to_dot_format_node_name__(p),
-                                                                      self.__to_dot_format_node_name__(c),
-                                                                      len(self.edge_results(p, c)))
+                commits_count = len(list(self.scm.version_range_list(p, c)))
+                msg= "    \"{}\" -> \"{}\"[label=\"{} commits, {} tests\"];\n"
+                out += msg.format(self.__to_dot_format_node_name__(p),
+                                  self.__to_dot_format_node_name__(c),
+                                  commits_count, len(self.edge_results(p, c)))
         out += "}"
 
         if output_file is not None:
