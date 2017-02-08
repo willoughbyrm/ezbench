@@ -1085,9 +1085,13 @@ class SmartEzbench:
 
             tasks.append((score, commit_sha1, test_name_to_run, runs, e))
 
+        # Sort the tasks by priority
+        tasks_sorted = sorted(tasks, key=lambda t: t[0])
+        tasks_sorted_str = pprint.pformat(tasks_sorted)
+        self.__log(Criticality.DD, "Needed tasks: {}".format(tasks_sorted_str))
+
         # If we are using the throttle mode, only schedule the commit with the
         # biggest score to speed up bisecting of the most important issues
-        tasks_sorted = sorted(tasks, key=lambda t: t[0])
         scheduled_commits = added = 0
         self.__reload_state(keep_lock=True)
         added = 0
