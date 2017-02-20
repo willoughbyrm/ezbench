@@ -213,6 +213,23 @@ start collecting data:
 
 This command will automatically change the state of the report to "run".
 
+== utils/owatch/owatch ==
+
+This tool monitors the output (on stdout and stderr) of a program and
+kills it if no output is seen in a given timeout period. If run as
+root, owatch will open and activate a hardware watchdog, and will ping
+it using the same timeout period. This will cause a reboot if no
+output is seen.
+
+This tool is only used by the tests that explicitly invoke it, it
+won't be used automatically for anything. An example is
+tests.d/piglit/igt.test.
+
+=== Dependencies ===
+
+ - gcc
+ - make
+
 == utils/ezbenchd.py ==
 
 This tool monitors the ezbench reports created using the "ezbench" command and
