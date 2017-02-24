@@ -1,6 +1,7 @@
 *.o
 *.so
 __pycache__
+*~
 
 builds/
 logs/
