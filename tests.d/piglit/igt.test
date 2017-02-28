@@ -6,6 +6,16 @@ if [ -f "$PIGLITCONFFILE" ]; then
     PIGLITCONF="-f $PIGLITCONFFILE"
 fi
 
+OWATCHBIN="$ezBenchDir/utils/owatch/owatch"
+OWATCH=
+if [ -x "$OWATCHBIN" ]; then
+    # Assuming a subtest takes no more than 10 minutes (600 seconds),
+    # ever. Additional 50 seconds of leeway given to account for the
+    # time taken by piglit's result collection before it prints
+    # anything.
+    OWATCH="$OWATCHBIN 650"
+fi
+
 function __igt_resume__ {
     cd "$REPO_PIGLIT"
 
@@ -17,7 +27,7 @@ function __igt_resume__ {
     # generate the report
     if [ -f "$piglit_output/metadata.json" ]; then
         # ignore the incomplete result to avoid being stuck in a loop
-        local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $REPO_PIGLIT/piglit resume $PIGLITCONF -n ${run_log_file}_tmp"
+        local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $OWATCH $REPO_PIGLIT/piglit resume $PIGLITCONF -n ${run_log_file}_tmp"
 
         ENV_DUMP_RESTRICT_TO_BINARY="NO_ENVDUMP_PLEASE" \
         $cmdline >> "$run_log_file.stdout" 2>> "$run_log_file.stderr"
@@ -60,7 +70,7 @@ function __igt_run__ {
     if [ -n "$PIGLITCONF" ]; then
 	ABORTFLAG="--abort-on-monitored-error"
     fi
-    local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $REPO_PIGLIT/piglit run $PIGLITCONF $ABORTFLAG $PIGLIT_RUN_PARAMS -s $parameters $testlist tests/igt.py ${piglit_output}"
+    local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $OWATCH $REPO_PIGLIT/piglit run $PIGLITCONF $ABORTFLAG $PIGLIT_RUN_PARAMS -s $parameters $testlist tests/igt.py ${piglit_output}"
 
     ENV_DUMP_REQUIRE_ARGUMENT="$REPO_PIGLIT/piglit" \
     ENV_DUMP_NO_METRICS=1 \
