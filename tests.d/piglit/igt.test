@@ -1,5 +1,11 @@
 test -e "$REPO_PIGLIT/piglit" || return 1
 
+PIGLITCONFFILE="$ezBenchDir/tests.d/piglit/igt.piglit.conf"
+PIGLITCONF=
+if [ -f "$PIGLITCONFFILE" ]; then
+    PIGLITCONF="-f $PIGLITCONFFILE"
+fi
+
 function __igt_resume__ {
     cd "$REPO_PIGLIT"
 
@@ -11,15 +17,15 @@ function __igt_resume__ {
     # generate the report
     if [ -f "$piglit_output/metadata.json" ]; then
         # ignore the incomplete result to avoid being stuck in a loop
-        local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $REPO_PIGLIT/piglit resume -n ${run_log_file}_tmp"
+        local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $REPO_PIGLIT/piglit resume $PIGLITCONF -n ${run_log_file}_tmp"
 
         ENV_DUMP_RESTRICT_TO_BINARY="NO_ENVDUMP_PLEASE" \
         $cmdline >> "$run_log_file.stdout" 2>> "$run_log_file.stderr"
         local exit_code=$?
 
-        # piglit resume returns 1 if we try to resume a report that is already done
         if [ $exit_code -ne 0 ]; then
-            __igt_resume__
+	    # reboot
+            return 74
         fi
     fi
 
@@ -50,7 +56,11 @@ function __igt_run__ {
     local piglit_output="${run_log_file}_tmp"
 
     # start piglit
-    local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $REPO_PIGLIT/piglit run $PIGLIT_RUN_PARAMS -s $parameters $testlist tests/igt.py ${piglit_output}"
+    ABORTFLAG=
+    if [ -n "$PIGLITCONF" ]; then
+	ABORTFLAG="--abort-on-monitored-error"
+    fi
+    local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $REPO_PIGLIT/piglit run $PIGLITCONF $ABORTFLAG $PIGLIT_RUN_PARAMS -s $parameters $testlist tests/igt.py ${piglit_output}"
 
     ENV_DUMP_REQUIRE_ARGUMENT="$REPO_PIGLIT/piglit" \
     ENV_DUMP_NO_METRICS=1 \
@@ -58,7 +68,13 @@ function __igt_run__ {
     local exit_code=$?
 
     if [ $exit_code -ne 0 ]; then
-        __igt_resume__
+	if [ -f "$piglit_output/metadata.json" ]; then
+            # Testing started but didn't complete. Reboot.
+	    return 74
+	else
+	    # Testing couldn't even begin
+	    return 1
+	fi
     else
         sudo chown -R "$(id -un):$(id -gn)" "$piglit_output"
         __piglit_gen_report__
