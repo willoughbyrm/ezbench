@@ -71,6 +71,8 @@ parser.add_argument("-c", dest='commits', help="Commits to run the tests on",
                     action="append")
 parser.add_argument("-r", dest='rounds', help="Number of execution rounds to add",
                     action="store", type=int, nargs='?')
+parser.add_argument("-e", dest='ensure', help="Make sure that at least N rounds are executed",
+                    action="store", type=int, nargs='?')
 parser.add_argument("-p", dest='profile', help="Profile to be used by ezbench",
                     action="store")
 parser.add_argument("-s", dest='add_conf_script', help="Add a configuration script for EzBench's runner",
@@ -183,15 +185,21 @@ if args.commits is not None and args.tests is not None:
     # Add all the commits and tests to commit
     for commit in run_info.commits:
         for test in run_info.tests:
-            total_rounds = sbench.add_test(commit, test, args.rounds)
-            if args.rounds >= 0:
-                print("added {} runs to {} on {} --> {} runs".format(rounds,
-                                                                     test, commit,
-                                                                     total_rounds))
+            if args.ensure is None:
+                total_rounds = sbench.add_test(commit, test, rounds)
+                if rounds >= 0:
+                    print("added {} runs to {} on {} --> {} runs".format(rounds,
+                                                                        test, commit,
+                                                                        total_rounds))
+                else:
+                    print("removed {} runs to {} on {} --> {} runs".format(-rounds,
+                                                                        test, commit,
+                                                                        total_rounds))
             else:
-                print("removed {} runs to {} on {} --> {} runs".format(-args.rounds,
-                                                                       test, commit,
-                                                                       total_rounds))
+                added = sbench.force_test_rounds(commit, test, args.ensure)
+                print("ensured {} runs of {} on {} --> added {} runs".format(int(args.ensure),
+                                                                             test, commit,
+                                                                             added))
 
 if args.commits is not None and len(testsets_to_be_added) > 0:
     # remove duplicates in the lists
@@ -210,15 +218,21 @@ if args.commits is not None and len(testsets_to_be_added) > 0:
     if not run_info.success():
         sys.exit(1)
 
-    # Default to 1 round if -r is not set
-    rounds = int(args.rounds)
-    if rounds is None:
-        rounds = 1
+    # Ensure runs if set
+    if args.ensure is None:
+        # Default to 1 round if -r is not set
+        rounds = int(args.rounds)
+        if rounds is None:
+            rounds = 1
+        ensure = False
+    else:
+        rounds = int(args.rounds)
+        ensure = True
 
     # Add the testsets specified
     for commit in run_info.commits:
         for testset in testsets_to_be_added:
-            sbench.add_testset(commit, testset, rounds)
+            sbench.add_testset(commit, testset, rounds, ensure)
 
 if args.command is not None:
     if args.command == "start":
