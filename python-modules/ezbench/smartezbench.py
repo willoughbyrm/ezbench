@@ -499,9 +499,7 @@ class SmartEzbench:
             commit = scm.full_version_name(commit)
 
         if rounds is None:
-            rounds = 3
-        else:
-            rounds = int(rounds)
+            return
 
         self.__task_tree_add_test__(self.state['commits'], commit, test, rounds)
 

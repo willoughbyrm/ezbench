@@ -69,7 +69,7 @@ parser.add_argument("-t", dest='testsets', help="Test sets to run", action="appe
 parser.add_argument("-T", dest='list_testsets', help="List the available testsets", action="store_true")
 parser.add_argument("-c", dest='commits', help="Commits to run the tests on",
                     action="append")
-parser.add_argument("-r", dest='rounds', help="Number of execution rounds",
+parser.add_argument("-r", dest='rounds', help="Number of execution rounds to add",
                     action="store", type=int, nargs='?')
 parser.add_argument("-p", dest='profile', help="Profile to be used by ezbench",
                     action="store")
@@ -175,11 +175,16 @@ if args.commits is not None and args.tests is not None:
     if not run_info.success():
         sys.exit(1)
 
+    # Default to 3 round if -r is not set
+    rounds = int(args.rounds)
+    if rounds is None:
+        rounds = 3
+
     # Add all the commits and tests to commit
     for commit in run_info.commits:
         for test in run_info.tests:
             print("add {count} runs to {test} on {commit}".format(count=args.rounds, test=test, commit=commit))
-            sbench.add_test(commit, test, args.rounds)
+            sbench.add_test(commit, test, rounds)
 
 if args.commits is not None and len(testsets_to_be_added) > 0:
     # remove duplicates in the lists
