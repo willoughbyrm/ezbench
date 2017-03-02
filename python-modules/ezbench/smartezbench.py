@@ -485,13 +485,18 @@ class SmartEzbench:
         else:
             task_tree[commit]['tests'][test]['rounds'] += rounds
 
+        total_rounds = task_tree[commit]['tests'][test]['rounds']
+
         # if the number of rounds is equal to 0 for a test, delete it
         if task_tree[commit]['tests'][test]['rounds'] <= 0:
             del task_tree[commit]['tests'][test]
+            total_rounds = 0
 
         # Delete a commit that has no test
         if len(task_tree[commit]['tests']) == 0:
             del task_tree[commit]
+
+        return total_rounds
 
     def __add_test_unlocked__(self, commit, test, rounds):
         scm = self.repo()
@@ -499,9 +504,9 @@ class SmartEzbench:
             commit = scm.full_version_name(commit)
 
         if rounds is None:
-            return
+            return self.state['commits'][commit]['tests'][test]['rounds']
 
-        self.__task_tree_add_test__(self.state['commits'], commit, test, rounds)
+        return self.__task_tree_add_test__(self.state['commits'], commit, test, rounds)
 
         # If the state was DONE, set it back to RUN
         if self.__running_mode_unlocked__(check_running=False) == RunningMode.DONE:
@@ -509,9 +514,10 @@ class SmartEzbench:
 
     def add_test(self, commit, test, rounds = None):
         self.__reload_state(keep_lock=True)
-        self.__add_test_unlocked__(commit, test, rounds)
+        total_rounds = self.__add_test_unlocked__(commit, test, rounds)
         self.__save_state()
         self.__release_lock()
+        return total_rounds
 
     def add_testset(self, commit, testset, rounds = 1):
         self.__reload_state(keep_lock=True)

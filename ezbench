@@ -183,8 +183,15 @@ if args.commits is not None and args.tests is not None:
     # Add all the commits and tests to commit
     for commit in run_info.commits:
         for test in run_info.tests:
-            print("add {count} runs to {test} on {commit}".format(count=args.rounds, test=test, commit=commit))
-            sbench.add_test(commit, test, rounds)
+            total_rounds = sbench.add_test(commit, test, args.rounds)
+            if args.rounds >= 0:
+                print("added {} runs to {} on {} --> {} runs".format(rounds,
+                                                                     test, commit,
+                                                                     total_rounds))
+            else:
+                print("removed {} runs to {} on {} --> {} runs".format(-args.rounds,
+                                                                       test, commit,
+                                                                       total_rounds))
 
 if args.commits is not None and len(testsets_to_be_added) > 0:
     # remove duplicates in the lists
