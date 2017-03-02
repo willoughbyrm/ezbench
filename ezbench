@@ -203,10 +203,15 @@ if args.commits is not None and len(testsets_to_be_added) > 0:
     if not run_info.success():
         sys.exit(1)
 
+    # Default to 1 round if -r is not set
+    rounds = int(args.rounds)
+    if rounds is None:
+        rounds = 1
+
     # Add the testsets specified
     for commit in run_info.commits:
         for testset in testsets_to_be_added:
-            sbench.add_testset(commit, testset, args.rounds)
+            sbench.add_testset(commit, testset, rounds)
 
 if args.command is not None:
     if args.command == "start":

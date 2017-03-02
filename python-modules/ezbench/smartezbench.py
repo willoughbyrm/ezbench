@@ -513,13 +513,8 @@ class SmartEzbench:
         self.__save_state()
         self.__release_lock()
 
-    def add_testset(self, commit, testset, rounds = None):
+    def add_testset(self, commit, testset, rounds = 1):
         self.__reload_state(keep_lock=True)
-
-        if rounds is None:
-            rounds = 1
-        else:
-            rounds = int(rounds)
 
         self.__log(Criticality.II, "Add the testset {} ({} tests)".format(testset.name,
                                                                          len(testset)))
