@@ -533,6 +533,10 @@ class SmartEzbench:
         self.__release_lock()
 
     def __force_test_rounds_unlocked__(self, commit, test, at_least):
+        scm = self.repo()
+        if scm is not None:
+            commit = scm.full_version_name(commit)
+
         if at_least < 1:
             return 0
         else:
