@@ -553,12 +553,7 @@ class SmartEzbench:
         to_add = at_least - self.state['commits'][commit]['tests'][test]['rounds']
 
         if to_add > 0:
-            self.__log(Criticality.WW,
-                       "Schedule {} more runs for the test {} on commit {}".format(to_add, test, commit))
-
             self.state['commits'][commit]['tests'][test]['rounds'] += to_add
-
-        if to_add > 0:
             return to_add
         else:
             return 0
@@ -1097,20 +1092,24 @@ class SmartEzbench:
         # biggest score to speed up bisecting of the most important issues
         scheduled_commits = added = 0
         self.__reload_state(keep_lock=True)
-        added = 0
+        total_added = 0
         while len(tasks_sorted) > 0 and scheduled_commits < commit_schedule_max:
             commit = tasks_sorted[-1][1]
             self.__log(Criticality.DD, "Add all the tasks using commit {}".format(commit))
             for t in tasks_sorted:
                 if t[1] == commit:
-                    added += self.__force_test_rounds_unlocked__(t[1], t[2], t[3])
-            if added > 0:
+                    added = self.__force_test_rounds_unlocked__(t[1], t[2], t[3])
+                    if added > 0:
+                        self.__log(Criticality.II,
+                                "Scheduled {} more runs for the test {} on commit {}".format(added, test, commit))
+                    total_added += added
+            if total_added > 0:
                 self.__log(Criticality.II, "{}".format(t[4]))
                 scheduled_commits += 1
             else:
                 self.__log(Criticality.DD, "No work scheduled using commit {}, try another one".format(commit))
             del tasks_sorted[-1]
-        if added > 0:
+        if total_added > 0:
             self.__save_state()
         self.__release_lock()
 
