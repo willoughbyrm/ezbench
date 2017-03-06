@@ -286,7 +286,7 @@ function compile_and_deploy {
 
     # Check for compilation errors
     if [ "$exit_code" -ne '0' ]; then
-        if [[ $exit_code -lt 71 && $exit_code -gt 74 ]]; then
+        if [[ $exit_code -lt 71 || $exit_code -gt 74 ]]; then
             return 70
         else
             return $exit_code
