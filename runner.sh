@@ -507,7 +507,7 @@ function run_bench {
     callIfDefined run_bench_post_hook
 
     # If the test does not have subtests, then store the execution time
-    if [ -z "$testSubTests" && "$testExecutionType" != "resume" ]; then
+    if [[ -z "$testSubTests" && "$testExecutionType" != "resume" ]]; then
         "$ezBenchDir/timing_DB/timing.py" -n test -k "$testName" -a $test_exec_time
     fi
 
