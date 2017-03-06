@@ -519,15 +519,17 @@ class SmartEzbench:
         self.__release_lock()
         return total_rounds
 
-    def add_testset(self, commit, testset, rounds = 1):
+    def add_testset(self, commit, testset, rounds = 1, ensure=False):
         self.__reload_state(keep_lock=True)
 
         self.__log(Criticality.II, "Add the testset {} ({} tests)".format(testset.name,
                                                                          len(testset)))
 
         for test in sorted(testset.keys()):
-            self.__add_test_unlocked__(commit, test,
-                                            testset[test] * rounds)
+            if not ensure:
+                self.__add_test_unlocked__(commit, test, testset[test] * rounds)
+            else:
+                self.__force_test_rounds_unlocked__(commit, test, testset[test] * rounds)
 
         self.__save_state()
         self.__release_lock()
