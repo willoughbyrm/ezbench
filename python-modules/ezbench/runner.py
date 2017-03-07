@@ -430,7 +430,7 @@ class Runner:
         for t in r.cmd_output:
             name, test_type, unit, inverted, time_estimation = t.split(',')
             tests.append(RunnerTest(name, test_type, unit,
-                                    (inverted == "1"), time_estimation))
+                                    (inverted == "1"), float(time_estimation)))
 
         return tests
 
