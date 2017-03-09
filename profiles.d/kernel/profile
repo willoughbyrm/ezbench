@@ -138,6 +138,9 @@ function __default_make_and_deploy__() {
         # Exit now, if there were some compilation errors
         if [ "$compile_error" -ne 0 ]
         then
+            # Call the user-defined post-compile hook
+            callIfDefined compile_post_hook
+
             sudo rm -rf "$(profile_repo_deployment_version_dir)"
             return $compile_error
         fi
