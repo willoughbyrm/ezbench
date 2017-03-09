@@ -800,6 +800,28 @@ done_testing
 
 # If the last command received was reboot, do it!
 if [ "$cmd" == "reboot" ]; then
+    # Default to 120 seconds if not set in user_parameters.sh
+    if [ -z "$WATCHDOG_TIMEOUT_SYNC" ]; then
+	WATCHDOG_TIMEOUT_SYNC=120
+    fi
+    if [ -z "$WATCHDOG_TIMEOUT_REBOOT" ]; then
+	WATCHDOG_TIMEOUT_REBOOT=120
+    fi
+
+    # Sync disks. Use owatch if available to time out with a power off
+    # if filesystems are jammed.
+    owcmdline=
+    owatchbin="$ezBenchDir/utils/owatch/owatch"
+    if [ -x "$owatchbin" ]; then
+	owcmdline="$owatchbin $WATCHDOG_TIMEOUT_SYNC"
+    fi
+    $owdcmdline sync
+
+    # Use reboot_wd to time out with a power off.
+    rwdbin="$ezBenchDir/utils/reboot_wd/reboot_wd"
+    if [ -x "$rwdbin" ]; then
+	sudo "$rwdbin" "$WATCHDOG_TIMEOUT_REBOOT"
+    fi
     sudo reboot
 fi
 

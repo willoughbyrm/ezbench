@@ -107,6 +107,10 @@ IGT_ROOT=/opt/intel-gpu-tools/
 IGT_BENCHMARKS=$IGT_ROOT/benchmarks
 IGT_TRACES=$IGT_ROOT/traces
 
+# watchdog timeout parameters
+WATCHDOG_TIMEOUT_SYNC=120
+WATCHDOG_TIMEOUT_REBOOT=120
+
 # Rendercheck
 RENDERCHECK_FOLDER=/opt/benchmarks/rendercheck/
 
