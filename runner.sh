@@ -506,8 +506,9 @@ function run_bench {
     test_exec_time=$(echo "$time_after - $time_before" | bc -l)
     callIfDefined run_bench_post_hook
 
-    # If the test does not have subtests, then store the execution time
-    if [[ -z "$testSubTests" && "$testExecutionType" != "resume" ]]; then
+    # If the test does not have subtests, then store the execution time if the run was successful.
+    # Success exit codes are 0 (no error) and 19 (already complete).
+    if [[ -z "$testSubTests" && "$testExecutionType" != "resume" ]] && [[ "$exit_code" -eq "0" || "$exit_code" -eq "19" ]]; then
         "$ezBenchDir/timing_DB/timing.py" -n test -k "$testName" -a $test_exec_time
     fi
 
