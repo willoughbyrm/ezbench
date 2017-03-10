@@ -298,7 +298,18 @@ class SmartEzbench:
             self.state['version'] = 1
             upgraded = True
 
-        latest_version = 1
+        if self.state.get("version", 0) == 1:
+            self.__log(Criticality.II, "state: v1 -> v2: move commits to tasks->user")
+            self.state['version'] = 2
+
+            # Create a new hierarchie for tasks
+            self.state['tasks'] = dict()
+            self.state['tasks']['user'] = dict()
+            self.state['tasks']['user']['commits'] = self.state['commits']
+            del self.state['commits']
+            upgraded = True
+
+        latest_version = 2
         if self.state.get("version", 0) > latest_version:
             msg = "The state's version is higher than the latest supported version: {} vs {}"
             raise ValueError(msg.format(self.state.get("version", 0), latest_version))
@@ -527,7 +538,8 @@ class SmartEzbench:
         if rounds is None:
             rounds = 0
 
-        rounds_old, rounds_new = self.__task_tree_add_test__(self.state['commits'], commit, test, rounds)
+        commits = self.state['tasks']['user']['commits']
+        rounds_old, rounds_new = self.__task_tree_add_test__(commits, commit, test, rounds)
 
         # If we added rounds and the state was DONE, set it back to RUN
         if (rounds_new > rounds_old and
@@ -568,18 +580,19 @@ class SmartEzbench:
         else:
             at_least = int(at_least)
 
-        if commit not in self.state['commits']:
-            self.state['commits'][commit] = dict()
-            self.state['commits'][commit]["tests"] = dict()
+        commits = self.state['tasks']['user']['commits']
+        if commit not in commits:
+            commits[commit] = dict()
+            commits[commit]["tests"] = dict()
 
-        if test not in self.state['commits'][commit]['tests']:
-            self.state['commits'][commit]['tests'][test] = dict()
-            self.state['commits'][commit]['tests'][test]['rounds'] = 0
+        if test not in commits[commit]['tests']:
+            commits[commit]['tests'][test] = dict()
+            commits[commit]['tests'][test]['rounds'] = 0
 
-        to_add = at_least - self.state['commits'][commit]['tests'][test]['rounds']
+        to_add = at_least - commits[commit]['tests'][test]['rounds']
 
         if to_add > 0:
-            self.state['commits'][commit]['tests'][test]['rounds'] += to_add
+            commits[commit]['tests'][test]['rounds'] += to_add
             return to_add
         else:
             return 0
@@ -746,7 +759,7 @@ class SmartEzbench:
                 events_str.append(str(event))
 
             # Walk down the report and get rid of every run that has already been made!
-            task_tree = copy.deepcopy(state.get('commits', dict()))
+            task_tree = copy.deepcopy(self.state['tasks']['user']['commits'])
 
             for commit in report.commits:
                 for result in commit.results.values():
