@@ -291,6 +291,21 @@ class SmartEzbench:
             self.__log(Criticality.EE, "Cannot release the lock: " + str(e))
             pass
 
+    def __update_state_version__(self):
+        upgraded = False
+        if self.state.get("version", 0) == 0:
+            self.__log(Criticality.II, "state: v0 -> v1: add a version parameter")
+            self.state['version'] = 1
+            upgraded = True
+
+        latest_version = 1
+        if self.state.get("version", 0) > latest_version:
+            msg = "The state's version is higher than the latest supported version: {} vs {}"
+            raise ValueError(msg.format(self.state.get("version", 0), latest_version))
+
+        if upgraded:
+            self.__save_state()
+
     def __reload_state_unlocked(self):
         # check if a report already exists
         try:
@@ -301,6 +316,8 @@ class SmartEzbench:
                 except Exception as e:
                     self.__log(Criticality.EE, "Exception while reading the state: " + str(e))
                     pass
+
+                self.__update_state_version__()
                 return True
         except IOError as e:
             self.__log(Criticality.WW, "Cannot open the state file: " + str(e))
