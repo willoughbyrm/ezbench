@@ -1103,7 +1103,7 @@ class SmartEzbench:
                     added = self.__force_test_rounds_unlocked__(t[1], t[2], t[3])
                     if added > 0:
                         self.__log(Criticality.II,
-                                "Scheduled {} more runs for the test {} on commit {}".format(added, test, commit))
+                                "Scheduled {} more runs for the test {} on commit {}".format(added, t[2], commit))
                     total_added += added
             if total_added > 0:
                 self.__log(Criticality.II, "{}".format(t[4]))
