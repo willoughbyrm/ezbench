@@ -68,6 +68,7 @@ class RunningMode(Enum):
     ERROR = 3
     ABORT = 4
     DONE = 5
+    TIMEOUT = 6
 
     # Intermediate steps, going from RUN to RUNNING or RUNNING to PAUSE/ABORT
     INTERMEDIATE = 100
