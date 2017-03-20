@@ -206,6 +206,10 @@ class SmartEzbenchAttributes(Enum):
     variance_max_run_count = 301
     variance_min_run_count = 302
 
+    report_priority = 400
+    report_deadline_soft = 401
+    report_deadline_hard = 402
+
 class SmartEzbench:
     def __init__(self, ezbench_dir, report_name, readonly = False,
                  hook_binary_path = None):
@@ -1070,6 +1074,12 @@ class SmartEzbench:
             return self.__attribute__(param, 20)
         elif p == SmartEzbenchAttributes.variance_min_run_count:
             return self.__attribute__(param, 2)
+        elif p == SmartEzbenchAttributes.report_priority:
+            return self.__attribute__(param, 0)
+        elif p == SmartEzbenchAttributes.report_deadline_soft:
+            return self.__attribute__(param, -1)
+        elif p == SmartEzbenchAttributes.report_deadline_hard:
+            return self.__attribute__(param, -1)
 
     def set_attribute(self, param, value):
         # verify that the attribute exists
