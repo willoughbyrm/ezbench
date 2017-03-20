@@ -203,8 +203,8 @@ class SmartEzbenchAttributes(Enum):
     perf_min_change = 200
 
     variance_max = 300
-    variance_max_run_count = 201
-    variance_min_run_count = 202
+    variance_max_run_count = 301
+    variance_min_run_count = 302
 
 class SmartEzbench:
     def __init__(self, ezbench_dir, report_name, readonly = False,
