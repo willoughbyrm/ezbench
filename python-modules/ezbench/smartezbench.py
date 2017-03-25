@@ -213,12 +213,13 @@ class SmartEzbenchAttributes(Enum):
 
 class SmartEzbench:
     def __init__(self, ezbench_dir, report_name, readonly = False,
-                 hook_binary_path = None):
+                 hook_binary_path = None, logs_callback = None):
         self.readonly = readonly
         self.ezbench_dir = ezbench_dir
         self.report_name = report_name
         self.log_folder = ezbench_dir + '/logs/' + report_name
         self.hook_binary_path = hook_binary_path
+        self.logs_callback = logs_callback
         self.smart_ezbench_state = self.log_folder + "/smartezbench.state"
         self.smart_ezbench_lock = self.log_folder + "/smartezbench.lock"
         self.smart_ezbench_log = self.log_folder + "/smartezbench.log"
@@ -258,6 +259,8 @@ class SmartEzbench:
         log_msg = "{time}: ({error}) {msg}\n".format(time=time, error=error.name, msg=msg)
         if error.value <= self.min_criticality.value:
             print(log_msg, end="")
+            if self.logs_callback is not None:
+                self.logs_callback(self, log_msg)
             if not self.readonly:
                 self.log_file.write(log_msg)
                 self.log_file.flush()
