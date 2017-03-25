@@ -130,8 +130,8 @@ if args.testsets is not None:
 
         if args.report_name is None:
             print("The test set '{}' contains the following tests:".format(name))
-            for test in sorted(testset.tests.keys()):
-                print("\t{} --> {} rounds".format(test, testset.tests[test]))
+            for test in sorted(testset.keys()):
+                print("\t{} --> {} rounds".format(test, testset[test]))
             print("")
             sys.exit(0)
 
