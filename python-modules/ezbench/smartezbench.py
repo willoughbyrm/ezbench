@@ -576,6 +576,8 @@ class SmartEzbench:
 
     def add_test(self, commit, test, rounds = None, user_requested=True):
         self.__reload_state(keep_lock=True)
+        source = "user" if user_requested else "machine"
+        self.__log(Criticality.II, "Add the {}-requested test {} ({} rounds)".format(source, test, rounds))
         total_rounds = self.__add_test_unlocked__(commit, test, rounds)
         self.__save_state()
         self.__release_lock()
