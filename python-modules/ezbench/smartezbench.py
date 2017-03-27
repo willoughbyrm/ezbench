@@ -637,6 +637,14 @@ class SmartEzbench:
 
         return ret
 
+    def reset_work(self):
+        self.__reload_state(keep_lock=True)
+        self.__log(Criticality.II, "Reset the queued work")
+        self.state['tasks']['user']['commits'] = dict()
+        self.state['tasks']['auto']['commits'] = dict()
+        self.__save_state()
+        self.__release_lock()
+
     def task_info(self):
         self._task_lock.acquire()
         tl = copy.deepcopy(self._task_list)
