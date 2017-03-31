@@ -413,6 +413,7 @@ class SmartEzbench:
         return self.__read_attribute__('profile')
 
     def set_profile(self, profile):
+        ret = False
         self.__reload_state(keep_lock=True)
         if 'beenRunBefore' not in self.state or self.state['beenRunBefore'] == False:
             # Check that the profile exists!
@@ -422,19 +423,20 @@ class SmartEzbench:
                 self.state['profile'] = profile
                 self.__log(Criticality.II, "Ezbench profile set to '{profile}'".format(profile=profile))
                 self.__save_state()
+                ret = True
             except RunnerError as e:
-                if e.args['err_code'] == RunnerErrorCode.ARG_PROFILE_INVALID:
+                if e.args[0]['err_code'] == RunnerErrorCode.CMD_PROFILE_INVALID:
                     self.__log(Criticality.EE,
                                "Invalid profile name '{}'.".format(profile))
                 else:
                     self.__log(Criticality.EE,
-                               "The following error arose '{}({})'.".format(e.args['err_code'],
-                                                                            e.args['err_str']))
-            finally:
-                del runner
+                               "The following error arose '{}({})'.".format(e.args[0]['err_code'],
+                                                                            e.args[0]['err_str']))
         else:
             self.__log(Criticality.EE, "You cannot change the profile of a report that already has results. Start a new one.")
         self.__release_lock()
+
+        return ret
 
     def conf_scripts(self):
         return self.__read_attribute__('conf_scripts', [])
