@@ -26,6 +26,7 @@
 
 #include <fcntl.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,28 +45,50 @@ int usage(const char* exe)
   return 1;
 }
 
-int watchdogfd = -1;
+#define NUM_WDS 25
+int _watchdogfd[NUM_WDS];
+
+void init_wd()
+{
+  int i;
+
+  for (i = 0; i < NUM_WDS; ++i) {
+    _watchdogfd[i] = -1;
+  }
+}
 
 void wd_settimeout(int timeout)
 {
-  if (watchdogfd >= 0)
-    ioctl(watchdogfd, WDIOC_SETTIMEOUT, &timeout);
+  int i;
+
+  for (i = 0; i < NUM_WDS; ++i) {
+    if (_watchdogfd[i] >= 0)
+      ioctl(_watchdogfd[i], WDIOC_SETTIMEOUT, &timeout);
+  }
 }
 
 void wd_heartbeat()
 {
-  if (watchdogfd >= 0)
-    ioctl(watchdogfd, WDIOC_KEEPALIVE, 0);
+  int i;
+
+  for (i = 0; i < NUM_WDS; ++i) {
+    if (_watchdogfd[i] >= 0)
+      ioctl(_watchdogfd[i], WDIOC_KEEPALIVE, 0);
+  }
 }
 
 void wd_close()
 {
-  if (watchdogfd < 0)
-    return;
+  int i;
 
-  write(watchdogfd, "V", 1);
-  close(watchdogfd);
-  watchdogfd = -1;
+  for (i = 0; i < NUM_WDS; ++i) {
+    if (_watchdogfd[i] < 0)
+      continue;
+
+    write(_watchdogfd[i], "V", 1);
+    close(_watchdogfd[i]);
+    _watchdogfd[i] = -1;
+  }
 }
 
 void open_watchdog_dev(int timeout)
@@ -74,15 +97,35 @@ void open_watchdog_dev(int timeout)
   char buf[255];
   int i;
 
-  for (i = 0; i < 25; ++i) {
+  for (i = 0; i < NUM_WDS; ++i) {
     snprintf(buf, 255, "/dev/watchdog%d", i);
     fd = open(buf, O_WRONLY);
     if (fd >= 0) {
       printf("owatch: Using watchdog device %s\n", buf);
-      watchdogfd = fd;
-      wd_settimeout(timeout);
-      return;
+      _watchdogfd[i] = fd;
     }
+  }
+
+  wd_settimeout(timeout);
+}
+
+bool have_any_wd()
+{
+  int i;
+
+  for (i = 0; i < NUM_WDS; ++i) {
+    if (_watchdogfd[i] >= 0)
+      return true;
+  }
+
+  return false;
+}
+
+void watchdog_die(int timeout)
+{
+  if (have_any_wd()) {
+    wd_settimeout(1);
+    sleep(3);
   }
 }
 
@@ -167,10 +210,7 @@ void overwatch(pid_t child, int timeout, int outpipe[2], int errpipe[2])
 
     /* Hack: If we have a hw watchdog, don't bother killing children.
      * Just stop the heartbeat. */
-    if (watchdogfd >= 0) {
-      wd_settimeout(1);
-      sleep(3);
-    }
+    watchdog_die(3);
 
     printf("owatch: Killing children\n");
 
@@ -253,6 +293,8 @@ int main(int argc, char** argv)
   int errpipe[2];
   int timeout;
   pid_t child;
+
+  init_wd();
 
   if (argc < 3) {
     exit(usage(argv[0]));
