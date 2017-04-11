@@ -1092,9 +1092,8 @@ class SmartEzbench:
 
         # If we are using the throttle mode, only schedule the commit with the
         # biggest score to speed up bisecting of the most important issues
-        scheduled_commits = added = 0
+        scheduled_commits = total_added = 0
         self.__reload_state(keep_lock=True)
-        total_added = 0
         while len(tasks_sorted) > 0 and scheduled_commits < commit_schedule_max:
             commit = tasks_sorted[-1][1]
             self.__log(Criticality.DD, "Add all the tasks using commit {}".format(commit))
@@ -1117,8 +1116,7 @@ class SmartEzbench:
 
         self.__log(Criticality.II, "Done enhancing the report")
 
-
-        if (added == 0 and
+        if (total_added == 0 and
             self.__running_mode_unlocked__(check_running=False) == RunningMode.RUN):
             self.set_running_mode(RunningMode.DONE)
 
