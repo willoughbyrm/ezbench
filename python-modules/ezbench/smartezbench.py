@@ -480,6 +480,8 @@ class SmartEzbench:
                     self.__log(Criticality.EE,
                                "The following error arose '{}({})'.".format(e.args[0]['err_code'],
                                                                             e.args[0]['err_str']))
+        elif profile == self.state['profile']:
+            ret = True
         else:
             self.__log(Criticality.EE, "You cannot change the profile of a report that already has results. Start a new one.")
         self.__release_lock()
