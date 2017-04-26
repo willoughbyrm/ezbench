@@ -194,8 +194,6 @@ class TaskEntry:
 
         return string
 
-GitCommit = namedtuple('GitCommit', 'sha1 timestamp')
-
 class SmartEzbenchAttributes(Enum):
     event_min_confidence = 1
 
