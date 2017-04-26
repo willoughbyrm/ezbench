@@ -211,13 +211,15 @@ class SmartEzbenchAttributes(Enum):
 
 class SmartEzbench:
     def __init__(self, ezbench_dir, report_name, readonly = False,
-                 hook_binary_path = None, logs_callback = None):
+                 hook_binary_path = None, logs_callback = None,
+                 hooks_callback = None):
         self.readonly = readonly
         self.ezbench_dir = ezbench_dir
         self.report_name = report_name
         self.log_folder = ezbench_dir + '/logs/' + report_name
         self.hook_binary_path = hook_binary_path
         self.logs_callback = logs_callback
+        self.hooks_callback = hooks_callback
         self.smart_ezbench_state = self.log_folder + "/smartezbench.state"
         self.smart_ezbench_lock = self.log_folder + "/smartezbench.lock"
         self.smart_ezbench_log = self.log_folder + "/smartezbench.log"
@@ -265,6 +267,25 @@ class SmartEzbench:
 
     # WARNING: Call this function after making sure state has an up-to-date state
     def __call_hook__(self, action, parameters = dict()):
+        if self.hooks_callback is not None:
+            HookCallbackState = namedtuple('HookCallbackState', ['action', 'ezbench_dir',
+                                                                 'ezbench_report_name',
+                                                                 'ezbench_report_path',
+                                                                 'ezbench_report_mode',
+                                                                 'hook_parameters'])
+            state = HookCallbackState(action=str(action),
+                                      ezbench_dir = str(self.ezbench_dir),
+                                      ezbench_report_name = str(self.report_name),
+                                      ezbench_report_path = str(self.log_folder),
+                                      ezbench_report_mode = str(RunningMode(self.state['mode']).name),
+                                      hook_parameters=parameters)
+
+            try:
+                self.hooks_callback(state)
+            except:
+                traceback.print_exc(file=sys.stderr)
+                sys.stderr.write("\n")
+
         if self.hook_binary_path is None:
             return
 
