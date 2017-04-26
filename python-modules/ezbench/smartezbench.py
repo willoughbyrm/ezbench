@@ -268,18 +268,10 @@ class SmartEzbench:
     # WARNING: Call this function after making sure state has an up-to-date state
     def __call_hook__(self, action, parameters = dict()):
         if self.hooks_callback is not None:
-            HookCallbackState = namedtuple('HookCallbackState', ['action', 'ezbench_dir',
-                                                                 'ezbench_report_name',
-                                                                 'ezbench_report_path',
-                                                                 'ezbench_report_mode',
+            HookCallbackState = namedtuple('HookCallbackState', ['sbench', 'action',
                                                                  'hook_parameters'])
-            state = HookCallbackState(action=str(action),
-                                      ezbench_dir = str(self.ezbench_dir),
-                                      ezbench_report_name = str(self.report_name),
-                                      ezbench_report_path = str(self.log_folder),
-                                      ezbench_report_mode = str(RunningMode(self.state['mode']).name),
+            state = HookCallbackState(sbench=self, action=str(action),
                                       hook_parameters=parameters)
-
             try:
                 self.hooks_callback(state)
             except:
@@ -980,8 +972,9 @@ class SmartEzbench:
             # Start the task
             self._task_current.started()
             for r in range(0, e.rounds):
-                self._task_lock.release()
+                self.__call_hook__('start_running_test', { "task": self._task_current })
 
+                self._task_lock.release()
                 try:
                     if e.resumeResultFile is not None:
                         time, cmd_output = runner.resume(e.commit, e.test, e.resumeResultFile, False)
@@ -1022,8 +1015,11 @@ class SmartEzbench:
 
                         # Since we cannot compile/deploy the commit, abort all the
                         # runs scheduled for this test on this commit
+                        self.__call_hook__('done_running_test', { "task": self._task_current })
+                        self._task_current.round_done()
                         break
 
+                self.__call_hook__('done_running_test', { "task": self._task_current })
                 self._task_current.round_done()
 
         # Now that we have run everything, we can delete the "auto" tests
