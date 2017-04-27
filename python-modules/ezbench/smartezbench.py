@@ -340,7 +340,13 @@ class SmartEzbench:
             self.state['tasks']['auto']['commits'] = dict()
             upgraded = True
 
-        latest_version = 3
+        if self.state.get("version", 0) == 3:
+            self.__log(Criticality.II, "state: v3 -> v4: create a new 'user_data' section")
+            self.state['version'] = 4
+            self.state['user_data'] = dict()
+            upgraded = True
+
+        latest_version = 4
         if self.state.get("version", 0) > latest_version:
             msg = "The state's version is higher than the latest supported version: {} vs {}"
             raise ValueError(msg.format(self.state.get("version", 0), latest_version))
@@ -1123,6 +1129,18 @@ class SmartEzbench:
         self.__release_lock()
 
         self.__log(Criticality.II, "Attribute '{}' set to {}".format(param, value))
+
+    def user_data(self, key, default=None):
+        self.__reload_state(keep_lock = True)
+        ret = self.state['user_data'].get(key, default)
+        self.__release_lock()
+        return ret
+
+    def set_user_data(self, key, value):
+        self.__reload_state(keep_lock = True)
+        self.state['user_data'][key] = value
+        self.__save_state()
+        self.__release_lock()
 
     def schedule_enhancements(self):
         # Read all the attributes
