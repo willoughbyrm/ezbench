@@ -873,6 +873,10 @@ class SmartEzbench:
                         # Cancel any other test on this commit
                         self._task_list = deque([x for x in self._task_list if not x.commit == e.commit])
 
+                        # Since we cannot compile/deploy the commit, abort all the
+                        # runs scheduled for this test on this commit
+                        break
+
                 self._task_current.round_done()
 
         self._task_current = None
