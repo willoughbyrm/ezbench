@@ -373,10 +373,10 @@ class Runner:
         try:
             self.runner.stdin.write(cmd + "\n")
             self.runner.stdin.flush()
-        except:
+        except Exception as e:
             err = "Could not send the command '{}'\n".format(cmd)
             raise RunnerError(dict({"msg": err, "err_str": err,
-                                "err_code":RunnerErrorCode.UNKNOWN}))
+                                "err_code":RunnerErrorCode.UNKNOWN})) from e
 
         # Read the output
         cmd_output = []
