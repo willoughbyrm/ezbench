@@ -370,8 +370,13 @@ class Runner:
 
         # Send the wanted command
         timestamp = datetime.now()
-        self.runner.stdin.write(cmd + "\n")
-        self.runner.stdin.flush()
+        try:
+            self.runner.stdin.write(cmd + "\n")
+            self.runner.stdin.flush()
+        except:
+            err = "Could not send the command '{}'\n".format(cmd)
+            raise RunnerError(dict({"msg": err, "err_str": err,
+                                "err_code":RunnerErrorCode.UNKNOWN}))
 
         # Read the output
         cmd_output = []
