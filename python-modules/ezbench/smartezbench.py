@@ -805,7 +805,16 @@ class SmartEzbench:
         self.__call_hook__('start_running_tests')
 
         # Setup the test environment
-        runner.start_testing()
+        try:
+            runner.start_testing()
+        except RunnerError as error:
+            err_code = error.args[0]['err_code']
+            msg = error.args[0]['msg']
+            self.__log(Criticality.EE,
+                       "Got the following error when trying to start testing: {}".format(msg))
+            self.set_running_mode(RunningMode.ERROR)
+            self._task_lock.release()
+            return False
 
         # Start generating runner calls
         while len(self._task_list) > 0:
