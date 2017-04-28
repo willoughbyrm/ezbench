@@ -866,7 +866,8 @@ class SmartEzbench:
                           err_code.value < RunnerErrorCode.COMP_DEP_UNK_ERROR.value):
                         # Error we cannot do anything about, probably a setup issue
                         # Let's mark the run as aborted until the user resets it!
-                        self.__log(Criticality.EE,  error.args[0]['err_code'])
+                        err_msg="Ezbench runner returned the following error code: {}"
+                        self.__log(Criticality.EE, err_msg.format( error.args[0]['err_code']))
                         self.set_running_mode(RunningMode.ERROR)
                     elif (err_code == RunnerErrorCode.COMPILATION_FAILED or
                           err_code == RunnerErrorCode.DEPLOYMENT_FAILED):
