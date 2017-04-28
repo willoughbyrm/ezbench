@@ -178,9 +178,10 @@ if args.commits is not None and args.tests is not None:
         sys.exit(1)
 
     # Default to 3 round if -r is not set
-    rounds = int(args.rounds)
-    if rounds is None:
+    if args.rounds is None:
         rounds = 3
+    else:
+        rounds = int(args.rounds)
 
     # Add all the commits and tests to commit
     for commit in run_info.commits:
