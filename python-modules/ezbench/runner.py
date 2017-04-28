@@ -353,7 +353,11 @@ class Runner:
             raise ValueError("The runner implements a different version ({}) than we do ({})".format(runner_version, self.ABI))
 
     def __del__(self):
-        self.done()
+        try:
+            self.done()
+        except:
+            # Silently ignore errors
+            pass
 
     def __send_command__(self, cmd):
         """
