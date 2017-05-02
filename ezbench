@@ -197,7 +197,7 @@ if args.commits is not None and args.tests is not None:
                                                                         test, commit,
                                                                         total_rounds))
             else:
-                added = sbench.force_test_rounds(commit, test, args.ensure)
+                added = sbench.force_test_rounds(commit, test, int(args.ensure))
                 print("ensured {} runs of {} on {} --> added {} runs".format(int(args.ensure),
                                                                              test, commit,
                                                                              added))
@@ -222,12 +222,13 @@ if args.commits is not None and len(testsets_to_be_added) > 0:
     # Ensure runs if set
     if args.ensure is None:
         # Default to 1 round if -r is not set
-        rounds = int(args.rounds)
-        if rounds is None:
+        if args.rounds is None:
             rounds = 1
+        else:
+            rounds = int(args.rounds)
         ensure = False
     else:
-        rounds = int(args.rounds)
+        rounds = int(args.ensure)
         ensure = True
 
     # Add the testsets specified
