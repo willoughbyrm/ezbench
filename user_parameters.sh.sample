@@ -61,9 +61,6 @@ APITRACE_BINARY=/usr/bin/apitrace
 GLRETRACE_BINARY=/usr/bin/glretrace
 APITRACE_TRACE_FOLDER=/opt/benchmarks/apitraces
 
-# Benchmark parameters
-SYNMARK_FOLDER=/opt/benchmarks/SynMark2
-
 # UE4 parameters
 UE4_FOLDER="/opt/benchmarks/Unreal Engine 4"
 UE4_WINDOW_SIZE_X=128
@@ -78,9 +75,6 @@ GPUTEST_FOLDER=/opt/benchmarks/GpuTest_Linux_x64_0.7.0
 
 # Lightsmark settings
 LIGHTSMARK_FOLDER=/opt/benchmarks/lightsmark-1.2.0
-
-# Citybench settings
-CITYBENCH_FOLDER=/opt/replay_hbas_citybench
 
 # GLBenchmark settings
 GLBENCHMARK27_FOLDER=/opt/benchmarks/glbenchmark2.7.0/
