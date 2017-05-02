@@ -1,4 +1,4 @@
-[ -e $LIGHTSMARK_FOLDER/bin/pc-linux64 ] || return 1
+[ -e "$LIGHTSMARK_FOLDER/Lightsmark2008.2.0/bin/pc-linux64" ] || return 1
 
 # This is Lightsmark 2008 [Linux 64bit] log. Check it if benchmark doesn't work properly.
 # Penumbra quality: 8/8 on Mesa DRI Intel(R) HD Graphics (Cherryview) .
@@ -12,9 +12,10 @@
 __lightsmark__() {
     local extract_fps="sed '/Finished/!d; s/.* fps = \(.*\).$/\1/'"
 
-    cd $LIGHTSMARK_FOLDER/bin/pc-linux64
+    cd "$LIGHTSMARK_FOLDER/Lightsmark2008.2.0/bin/pc-linux64"
 
-    LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH run_bench 0 ./backend silent $1 | eval $extract_fps
+    LD_LIBRARY_PATH=.:../../../lightsmark_lib/64bit/:$LD_LIBRARY_PATH \
+    run_bench 0 ./backend silent $1 | eval $extract_fps
 }
 
 while read name resolution; do
