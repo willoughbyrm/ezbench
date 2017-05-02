@@ -412,6 +412,7 @@ class GitRepo:
             repo_path: A valid path to the git repo
         """
 
+        self.repo_path = repo_path
         self.repo = pygit2.Repository(repo_path)
         self._cached_merged_bases = dict()
 
@@ -638,6 +639,7 @@ class NoRepo:
             repo_path: A valid path to the git repo
         """
 
+        self.repo_path = repo_path
         self._desc = dict()
         self._version_graph = ResultsDAG(self)
         self._first_version = None
