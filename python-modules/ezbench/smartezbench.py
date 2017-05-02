@@ -79,7 +79,7 @@ class RunningMode(Enum):
 
 def list_smart_ezbench_report_names(ezbench_dir, updatedSince = 0):
     log_dir = ezbench_dir + '/logs'
-    state_files = glob.glob("{log_dir}/*/smartezbench.state".format(log_dir=log_dir));
+    state_files = glob.glob("{}/**/smartezbench.state".format(log_dir), recursive=True)
 
     reports = []
     for state_file in state_files:
