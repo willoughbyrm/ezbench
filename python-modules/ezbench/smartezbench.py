@@ -994,8 +994,7 @@ class SmartEzbench:
                         # The result is un-resumable, schedule a full run at the end
                         self._task_list.append(TaskEntry(e.commit, e.test, 1))
                     elif err_code == RunnerErrorCode.REBOOT_NEEDED:
-                        # TODO: have some sort of hooks here to warn the rest of the world
-                        # that we are about to reboot
+                        self.__call_hook__('reboot_needed', { "task": self._task_current })
                         self._task_list = deque()
                         self._task_current = None
                         self.__log(Criticality.II, "Rebooting...")
