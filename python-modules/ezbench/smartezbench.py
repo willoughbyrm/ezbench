@@ -484,39 +484,40 @@ class SmartEzbench:
         if test not in task_tree[commit]['tests']:
             task_tree[commit]['tests'][test] = dict()
             task_tree[commit]['tests'][test]['rounds'] = rounds
+            total_rounds_before = 0
         else:
+            total_rounds_before = task_tree[commit]['tests'][test]['rounds']
             task_tree[commit]['tests'][test]['rounds'] += rounds
 
-        total_rounds = task_tree[commit]['tests'][test]['rounds']
+        total_rounds_after = task_tree[commit]['tests'][test]['rounds']
 
         # if the number of rounds is equal to 0 for a test, delete it
         if task_tree[commit]['tests'][test]['rounds'] <= 0:
             del task_tree[commit]['tests'][test]
-            total_rounds = 0
+            total_rounds_after = 0
 
         # Delete a commit that has no test
         if len(task_tree[commit]['tests']) == 0:
             del task_tree[commit]
 
-        return total_rounds
+        return total_rounds_before, total_rounds_after
 
     def __add_test_unlocked__(self, commit, test, rounds):
         scm = self.repo()
         if scm is not None:
             commit = scm.full_version_name(commit)
 
-        total_rounds = self.state['commits'][commit]['tests'][test]['rounds']
         if rounds is None:
-            return self.state['commits'][commit]['tests'][test]['rounds']
+            rounds = 0
 
-        new_total_rounds = self.__task_tree_add_test__(self.state['commits'], commit, test, rounds)
+        rounds_old, rounds_new = self.__task_tree_add_test__(self.state['commits'], commit, test, rounds)
 
         # If we added rounds and the state was DONE, set it back to RUN
-        if (new_total_rounds > total_rounds and
+        if (rounds_new > rounds_old and
             self.__running_mode_unlocked__(check_running=False) == RunningMode.DONE):
             self.__set_running_mode_unlocked__(RunningMode.RUN)
 
-        return new_total_rounds
+        return rounds_new
 
     def add_test(self, commit, test, rounds = None):
         self.__reload_state(keep_lock=True)
