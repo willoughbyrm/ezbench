@@ -505,14 +505,18 @@ class SmartEzbench:
         if scm is not None:
             commit = scm.full_version_name(commit)
 
+        total_rounds = self.state['commits'][commit]['tests'][test]['rounds']
         if rounds is None:
             return self.state['commits'][commit]['tests'][test]['rounds']
 
-        return self.__task_tree_add_test__(self.state['commits'], commit, test, rounds)
+        new_total_rounds = self.__task_tree_add_test__(self.state['commits'], commit, test, rounds)
 
-        # If the state was DONE, set it back to RUN
-        if self.__running_mode_unlocked__(check_running=False) == RunningMode.DONE:
+        # If we added rounds and the state was DONE, set it back to RUN
+        if (new_total_rounds > total_rounds and
+            self.__running_mode_unlocked__(check_running=False) == RunningMode.DONE):
             self.__set_running_mode_unlocked__(RunningMode.RUN)
+
+        return new_total_rounds
 
     def add_test(self, commit, test, rounds = None):
         self.__reload_state(keep_lock=True)
