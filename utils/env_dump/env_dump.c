@@ -75,7 +75,11 @@ sig_handler(int sig, siginfo_t *siginfo, void *context)
 {
 	void (*const orig__exit)(int) = _env_dump_resolve_symbol_by_name("_exit");
 	fprintf(env_file, "EXIT_SIGNAL,%i (%s)\n", sig, strsignal(sig));
-	fini();
+	/* do not call fini() after receiving a segfault as it may do some allocation
+	 * which may fail. Seen with pthread_cancel() deadlocking.
+	*/
+	if (sig != SIGSEGV)
+		fini();
 	orig__exit(-1);
 }
 
