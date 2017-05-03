@@ -727,7 +727,7 @@ class SmartEzbench:
                 events_str.append(str(event))
 
             # Walk down the report and get rid of every run that has already been made!
-            task_tree = copy.deepcopy(state['commits'])
+            task_tree = copy.deepcopy(state.get('commits', dict()))
 
             for commit in report.commits:
                 for result in commit.results.values():
