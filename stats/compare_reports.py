@@ -595,7 +595,7 @@ def reports_to_html(reports, output, output_unit = None, title = None,
 								% endfor
 	</p>"\\
 								% for test in db["tests"]:
-									% if test in db["commits"][commit]['reports'][report.name]:
+									% if report.name in db["commits"][commit]['reports'] and test in db["commits"][commit]['reports'][report.name]:
 	, ${db["commits"][commit]['reports'][report.name][test].average}, "<h3>${report.name} - ${test}</h3><p>\\
 										% for r in db["reports"]:
 	<%
@@ -850,7 +850,7 @@ dataTable.addRows([['${test}', '${report1.name}', ${perf_diff}, "${r1.average_ra
 									% endif
 								%endif
 								% for commit in db["commits"]:
-									% if test in db["commits"][commit]['reports'][report.name]:
+									% if report.name in db["commits"][commit]['reports'] and test in db["commits"][commit]['reports'][report.name]:
 									% if metric in db["commits"][commit]['reports'][report.name][test].results(BenchSubTestType.METRIC):
 									<%
 										m = db["commits"][commit]['reports'][report.name][test].metrics[metric]
