@@ -86,13 +86,16 @@ def compare(image1, image2, metric, output, reset_cache=False):
     cache = '{}_compare_{}'.format(os.path.splitext(image1)[0],
             os.path.basename(os.path.splitext(image2)[0]))
     if not reset_cache and os.path.exists(cache):
-        diff = float(open(cache, 'rt').read())
-    else:
-        diff = compare_image(image1, image2, metric, output)
         try:
-            open(cache, 'wt').write(str(diff))
-        except Exception as e:
-            print("compare: Failed to write to the cache file '{}': {}".format(cache, e))
+            return float(open(cache, 'rt').read())
+        except:
+            print("compare: Invalid cached value in file '{}'".format(cache))
+
+    diff = compare_image(image1, image2, metric, output)
+    try:
+        open(cache, 'wt').write(str(diff))
+    except Exception as e:
+        print("compare: Failed to write to the cache file '{}': {}".format(cache, e))
 
     return diff
 
