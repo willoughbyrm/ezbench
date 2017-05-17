@@ -35,6 +35,8 @@ import argparse
 import shutil
 import sys
 import os
+import requests
+import datetime
 
 ezbench_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -83,14 +85,301 @@ parser.add_argument("-a", dest='attributes', help="Set an attribute",
                     type=AttributeString, action="append", choices=SmartEzbench.attributes())
 parser.add_argument("-l", dest='list_tests', help="List the available benchmarks",
                     action="store_true")
+parser.add_argument("-R", dest='rest_server', help="Base URL of controllerd REST server. If given, passes commands to the REST server instead.",
+                    action="store")
+parser.add_argument("-m", dest='machines', help="DUT name to operate on (repeatable). If not given, operate on all known machines.",
+                    action="append")
+parser.add_argument("-M", dest='list_machines', help="List available DUTs",
+                    action="store_true")
 parser.add_argument("report_name", nargs='?')
 parser.add_argument("command", help="Command to execute", nargs='?',
-                    choices=('start', 'run', 'pause', 'abort', 'status'))
+                    choices=('start', 'run', 'pause', 'abort', 'status', 'delete'))
 args = parser.parse_args()
 
+# TODO: Add a way to list jobs, and a way to download/fetch the reports
+
+class CommandHandler:
+    pass
+
+class RestHandler(CommandHandler):
+    def __init__(self, server):
+        self.server = server
+        self.machines = []
+
+    def get(self, url):
+        fullurl = self.server + url
+        r = requests.get(fullurl)
+        if r.status_code == 200:
+            return r.json()
+        else:
+            return None
+
+    def __check_return__(self, ret):
+        if ret.status_code != 200:
+            print(ret.text)
+            return False
+        return True
+
+    def post(self, url, data):
+        fullurl = self.server + url
+        self.__check_return__(requests.post(fullurl, json=data))
+
+    def put(self, url, data):
+        fullurl = self.server + url
+        self.__check_return__(requests.put(fullurl, json=data))
+
+    def patch(self, url, data):
+        fullurl = self.server + url
+        self.__check_return__(requests.patch(fullurl, json=data))
+
+    def delete(self, url):
+        fullurl = self.server + url
+        self.__check_return__(requests.delete(fullurl))
+
+    def add_machines(self, machines):
+        for m in machines:
+            self.machines.append(m)
+
+    def add_all_machines(self):
+        state = self.get("/machines")
+        for machine in state['machines']:
+            self.machines.append(machine)
+
+    def available_tests(self):
+        tests = set()
+
+        state = self.get("/machines")
+        for machine in self.machines:
+            mstate = self.get(state['machines'][machine]['url'])
+            for test in mstate['tests']:
+                tests.add(test)
+
+        return tests
+
+    def available_testsets(self):
+        testsets = set()
+
+        state = self.get("/machines")
+        for machine in self.machines:
+            mstate = self.get(state['machines'][machine]['url'])
+            for testset in mstate['testsets']:
+                testsets.add(testset)
+
+        return testsets
+
+    def set_report(self, report_name, profile):
+        # Create the job if it doesn't exist and we have a profile to give
+        self.job_url = "/jobs/{}".format(report_name)
+        state = self.get(self.job_url)
+        if state is None and profile is not None:
+            payload = { "description": "Test job",
+                        "profile": profile,
+                        "attributes": {},
+                        "machines": []
+                        }
+            for m in self.machines:
+                payload["machines"].append(m)
+            self.post(self.job_url, payload)
+
+        self.job_name = report_name
+        self.profile_name = profile
+
+    def set_attribute(self, key, val):
+        self.attributes[key] = val
+
+    def profile(self):
+        return self.profile_name
+
+    def add_tests(self, commits, tests, tests_exclude, rounds):
+        # TODO: tests_exclude
+        work = { "commits": {} }
+        for commit in commits:
+            for test in tests:
+                work["commits"][commit] = { "tests": {} }
+                work["commits"][commit]["tests"][test] = rounds
+        self.patch(self.job_url + "/work", work)
+
+    def run(self):
+        print("Invalid command: REST interface automatically runs all queued jobs")
+        sys.exit(1)
+
+    def set_running_mode(self, mode):
+        print("Invalid command: REST interface automatically runs all queued jobs")
+        sys.exit(1)
+
+    def status(self):
+        state = self.get(self.job_url)
+        if state is None:
+            print("Invalid job")
+            sys.exit(1)
+
+        all_done = True
+        print("Job: {}".format(state['id']))
+        print("Description: {}".format(state['description']))
+        print("Profile: {}".format(state['profile']))
+        print("Attributes:")
+        for attr in state['attributes']:
+            print(" {}: {}".format(attr, state['attributes'][attr]))
+        print("Machines:")
+        for name in state['machines']:
+            print(" {}:".format(name))
+            if state['machines'][name]['online']:
+                onlinestatus = "yes"
+            else:
+                mstatus = self.get("/machines/{}".format(name))
+                stamp = datetime.fromtimestamp(mstatus['last_seen'])
+                onlinestatus = "no (last seen: {})".format(stamp.isoformat(' '))
+            print("  Online: {}".format(onlinestatus))
+            if state['machines'][name]['state'] == 'MISSING':
+                print("  Does not have this job yet")
+                all_done = False
+                continue
+            mreport = self.get(state['machines'][name]['report'])
+            print("  State: {} (on disk: {})".format(mreport['state'], mreport['state_disk']))
+            if mreport['state'] != 'DONE':
+                all_done = False
+            print("  Average deploy time: {}".format(mreport['deploy_time']))
+            print("  Average build time: {}".format(mreport['build_time']))
+        if all_done:
+            print("All machines DONE")
+
+    def delete_job(self):
+        self.delete(self.job_url)
+
+    def list_machines(self):
+        machines = self.get("/machines")
+        for m in machines['machines']:
+            url = machines['machines'][m]['url']
+            mch = self.get(url)
+            print("{}:".format(m))
+            if mch['online']:
+                onlinestatus = "yes"
+            else:
+                stamp = datetime.fromtimestamp(mch['last_seen'])
+                onlinestatus = "no (last seen: {})".format(stamp.isoformat(' '))
+            print(" Online: {}".format(onlinestatus))
+            print(" Reports:")
+            isidle = True
+            for r in mch['reports']:
+                repstate = mch['reports'][r]['state']
+                print("  {}: {}".format(r, repstate))
+                if repstate == 'RUNNING' or repstate == 'RUN':
+                    isidle = False
+            unsent = []
+            for cmd in mch['queued_cmds']:
+                if cmd['err_code'] != 'OK':
+                    unsent.append(cmd['description'])
+            if unsent:
+                print(" Pending commands:")
+                for msg in unsent:
+                    print("  {}".format(msg))
+            print(" Idle: {}".format(isidle))
+
+class LocalHandler(CommandHandler):
+    def __init__(self):
+        self.ezbench = Ezbench(ezbench_dir = ezbench_dir)
+
+    def available_tests(self):
+        return self.ezbench.available_tests()
+
+    def available_testsets(self):
+        return Testset.list(ezbench_dir)
+
+    def set_report(self, report_name, profile):
+        self.sbench = SmartEzbench(ezbench_dir, report_name)
+        if self.sbench.profile() is None and profile is not None:
+            self.sbench.set_profile(profile)
+
+    def add_conf_scripts(self, addlist):
+        for add in addlist:
+            self.sbench.add_conf_script(add)
+
+    def remove_conf_scripts(self, rmlist):
+        for rm in rmlist:
+            self.sbench.remove_conf_script(rm)
+
+    def set_attribute(self, key, val):
+        self.sbench.set_attribute(key, val)
+
+    def profile(self):
+        return self.sbench.profile()
+
+    def add_tests(self, commits, tests, tests_exclude, rounds):
+        # get the list of tests that actually need to be ran
+        ezb = Ezbench(ezbench_dir=ezbench_dir,
+                      profile=self.sbench.profile(),
+                      report_name="tmp")
+        run_info = ezb.run(commits, tests, tests_exclude, dry_run=True)
+        if not run_info.success():
+            sys.exit(1)
+
+        # Add all the commits and tests to commit
+        for commit in run_info.commits:
+            for test in run_info.tests:
+                if args.ensure is None:
+                    total_rounds = self.sbench.add_test(commit, test, rounds)
+                    if rounds >= 0:
+                        print("added {} runs to {} on {} --> {} runs".format(rounds,
+                                                                             test, commit,
+                                                                             total_rounds))
+                    else:
+                        print("removed {} runs to {} on {} --> {} runs".format(-rounds,
+                                                                               test, commit,
+                                                                               total_rounds))
+                else:
+                    added = self.sbench.force_test_rounds(commit, test, int(args.ensure))
+                    print("ensured {} runs of {} on {} --> added {} runs".format(int(args.ensure),
+                                                                                 test, commit,
+                                                                                 added))
+
+    def add_testsets(self, commits, testsets_to_be_added, rounds, ensure):
+        # get the list of tests that actually need to be ran
+        ezb = Ezbench(ezbench_dir=ezbench_dir,
+                      profile=self.sbench.profile(),
+                      report_name="tmp")
+        run_info = ezb.run(commits, [], dry_run=True)
+        if not run_info.success():
+            sys.exit(1)
+
+        # Add the testsets specified
+        for commit in run_info.commits:
+            for testset in testsets_to_be_added:
+                self.sbench.add_testset(commit, testset, rounds, ensure)
+
+    def run(self):
+        self.sbench.run()
+
+    def set_running_mode(self, mode):
+        self.sbench.set_running_mode(mode)
+
+    def status(self):
+        print("Report name:", self.sbench.report_name)
+        print("Mode:", self.sbench.running_mode().name)
+
+        print("\nAttributes:")
+        for a in self.sbench.attributes():
+            print(" - {}: {}".format(a, self.sbench.attribute(a)))
+
+        print("\nRaw status:")
+        pprint.pprint(self.sbench.state)
+
+    def list_machines(self):
+        print("Not supported by the local handler", file=sys.stderr)
+
+    def delete_job(self):
+        self.sbench.delete()
+
+if args.rest_server:
+    handler = RestHandler(args.rest_server)
+    if args.machines is not None:
+        handler.add_machines(args.machines)
+    else:
+        handler.add_all_machines()
+else:
+    handler = LocalHandler()
+
 if args.list_tests:
-    ezbench = Ezbench(ezbench_dir=ezbench_dir)
-    tests = ezbench.available_tests()
+    tests = handler.available_tests()
 
     for test in sorted(tests):
         print(test)
@@ -98,7 +387,7 @@ if args.list_tests:
     sys.exit(0)
 
 if args.list_testsets:
-    testsets = Testset.list(ezbench_dir)
+    testsets = handler.available_testsets()
     if len(testsets) > 0:
         print("Available test sets:")
         for testset in testsets:
@@ -110,13 +399,16 @@ if args.list_testsets:
         print("No test sets are available")
     sys.exit(0)
 
+if args.list_machines:
+    handler.list_machines()
+    sys.exit(0)
+
 testsets_to_be_added = []
 if args.testsets is not None:
      # remove duplicates in the lists
     testsets = list(set(break_lists(args.testsets)))
 
-    ezbench = Ezbench(ezbench_dir=ezbench_dir)
-    tests = ezbench.available_tests()
+    tests = handler.available_tests()
 
     # Check all the testsets
     for name in testsets:
@@ -140,22 +432,18 @@ if args.testsets is not None:
 if args.report_name is None:
     print("Error: The report name is missing")
     sys.exit(1)
-sbench = SmartEzbench(ezbench_dir, args.report_name)
 
-if sbench.profile() is None and args.profile is not None:
-    sbench.set_profile(args.profile)
+handler.set_report(args.report_name, args.profile)
 
 if args.add_conf_script is not None:
-    for add in args.add_conf_script:
-        sbench.add_conf_script(add)
+    handler.add_conf_scripts(args.add_conf_script)
 
 if args.remove_conf_script is not None:
-    for add in args.remove_conf_script:
-        sbench.remove_conf_script(add)
+    handler.remove_conf_scripts(args.remove_conf_script)
 
 if args.attributes is not None:
     for attr in set(args.attributes):
-        sbench.set_attribute(attr, float(attributes_val[attr]))
+        handler.set_attribute(attr, float(attributes_val[attr]))
 
 # add commits and tests
 if args.commits is not None and args.tests is not None:
@@ -165,16 +453,8 @@ if args.commits is not None and args.tests is not None:
     tests_exclude = list(set(break_lists(args.tests_exclude)))
 
     # we cannot fetch the git sha1 without a profile/git repo
-    if sbench.profile() is None:
+    if handler.profile() is None:
         print("No profile is set, set one first with -p before adding test runs")
-        sys.exit(1)
-
-    # get the list of tests that actually need to be ran
-    ezbench = Ezbench(ezbench_dir=ezbench_dir,
-                  profile=sbench.profile(),
-                  report_name="tmp")
-    run_info = ezbench.run(commits, tests, tests_exclude, dry_run=True)
-    if not run_info.success():
         sys.exit(1)
 
     # Default to 3 round if -r is not set
@@ -183,40 +463,15 @@ if args.commits is not None and args.tests is not None:
     else:
         rounds = int(args.rounds)
 
-    # Add all the commits and tests to commit
-    for commit in run_info.commits:
-        for test in run_info.tests:
-            if args.ensure is None:
-                total_rounds = sbench.add_test(commit, test, rounds)
-                if rounds >= 0:
-                    print("added {} runs to {} on {} --> {} runs".format(rounds,
-                                                                        test, commit,
-                                                                        total_rounds))
-                else:
-                    print("removed {} runs to {} on {} --> {} runs".format(-rounds,
-                                                                        test, commit,
-                                                                        total_rounds))
-            else:
-                added = sbench.force_test_rounds(commit, test, int(args.ensure))
-                print("ensured {} runs of {} on {} --> added {} runs".format(int(args.ensure),
-                                                                             test, commit,
-                                                                             added))
+    handler.add_tests(commits, tests, tests_exclude, rounds)
 
 if args.commits is not None and len(testsets_to_be_added) > 0:
     # remove duplicates in the lists
     commits = list(set(break_lists(args.commits)))
 
     # we cannot fetch the git sha1 without a profile/git repo
-    if sbench.profile() is None:
+    if handler.profile() is None:
         print("No profile is set, set one first with -p before adding test runs")
-        sys.exit(1)
-
-    # get the list of tests that actually need to be ran
-    ezbench = Ezbench(ezbench_dir=ezbench_dir,
-                  profile=sbench.profile(),
-                  report_name="tmp")
-    run_info = ezbench.run(commits, [], dry_run=True)
-    if not run_info.success():
         sys.exit(1)
 
     # Ensure runs if set
@@ -231,29 +486,20 @@ if args.commits is not None and len(testsets_to_be_added) > 0:
         rounds = int(args.ensure)
         ensure = True
 
-    # Add the testsets specified
-    for commit in run_info.commits:
-        for testset in testsets_to_be_added:
-            sbench.add_testset(commit, testset, rounds, ensure)
+    handler.add_testsets(commits, testsets_to_be_added, rounds, ensure)
 
 if args.command is not None:
     if args.command == "start":
-        sbench.run()
+        handler.run()
     elif args.command == "run":
-        sbench.set_running_mode(RunningMode.RUN)
+        handler.set_running_mode(RunningMode.RUN)
     elif args.command == "pause":
-        sbench.set_running_mode(RunningMode.PAUSE)
+        handler.set_running_mode(RunningMode.PAUSE)
     elif args.command == "abort":
-        sbench.set_running_mode(RunningMode.ABORT)
+        handler.set_running_mode(RunningMode.ABORT)
     elif args.command == "status":
-        print("Report name:", sbench.report_name)
-        print("Mode:", sbench.running_mode().name)
-
-        print("\nAttributes:")
-        for a in sbench.attributes():
-            print(" - {}: {}".format(a, sbench.attribute(a)))
-
-        print("\nRaw status:")
-        pprint.pprint(sbench.state)
+        handler.status()
+    elif args.command == "delete":
+        handler.delete_job()
     else:
         print("Unknown command '{cmd}'".format(cmd=args.command))
