@@ -192,7 +192,7 @@ function profile_repo_compile_start() {
      # Use the new repo
     export PROFILE_REPO_OLDPWD=$(pwd)
     cd "$PROFILE_TMP_BUILD_DIR" || return 71
-    git reset --hard "$1"
+    git reset --hard "$1" || return 71
 
     # The repo may contain submodules, init and update them too
     git submodule update --init --recursive
