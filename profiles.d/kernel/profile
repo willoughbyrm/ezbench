@@ -116,12 +116,15 @@ function __default_make_and_deploy__() {
         local compile_start=$(date +%s)
 
         profile_repo_compile_start $version
+        compile_error=$?
 
         # Call the user-defined pre-compile hook
         callIfDefined compile_pre_hook
 
-        repo_compile_version
-        compile_error=$?
+        if [ "$compile_error" -eq 0 ]; then
+            repo_compile_version
+            compile_error=$?
+        fi
 
         profile_repo_compile_stop
 
