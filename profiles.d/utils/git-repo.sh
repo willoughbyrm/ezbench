@@ -70,7 +70,7 @@ function profile_repo_version_to_human() {
     GIT_DIR="$repoDir/.git" git show --format="%h %s" -s "$1" 2> /dev/null
     local ret=$?
     if [ $ret -ne 0 ]; then
-        echo $ret
+        echo "invalid_git_id"
         return $ret
     fi
 }
@@ -91,10 +91,10 @@ function profile_repo_version_title() {
 # Inputs:
 #   - $repoDir
 function profile_repo_version_from_human() {
-    GIT_DIR="$repoDir/.git" git rev-parse "$1" 2> /dev/null
+    GIT_DIR="$repoDir/.git" git rev-parse "${1}^{commit}" 2> /dev/null
     local ret=$?
     if [ $ret -ne 0 ]; then
-        echo $ret
+        echo "invalid_git_ref"
         return $ret
     fi
 }
