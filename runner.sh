@@ -357,7 +357,11 @@ function execute_test {
     find_test "$testName" || return 100
 
     # Get the full version name
-    local version=$(profile_repo_version_from_human $versionName) || return 50
+    local version
+    version=$(profile_repo_version_from_human $versionName)
+    if [ $? != 0 ]; then
+	return 50
+    fi
 
     # verify that the type of execution is available
     local execFuncName=${testName}_${testExecutionType}
