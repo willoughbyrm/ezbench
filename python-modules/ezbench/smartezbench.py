@@ -76,22 +76,6 @@ class RunningMode(Enum):
     PAUSING = 102
     ABORTING = 103
 
-
-def list_smart_ezbench_report_names(ezbench_dir, updatedSince = 0):
-    log_dir = ezbench_dir + '/logs'
-    state_files = glob.glob("{}/**/smartezbench.state".format(log_dir), recursive=True)
-
-    reports = []
-    for state_file in state_files:
-        if updatedSince > 0 and os.path.getmtime(state_file) < updatedSince:
-            continue
-
-        start = len(log_dir) + 1
-        stop = len(state_file) - 19
-        reports.append(state_file[start:stop])
-
-    return reports
-
 class TaskEntry:
     def __init__(self, commit, test, rounds, resumeResultFile = None,
                  user_requested = True):
@@ -210,6 +194,22 @@ class SmartEzbenchAttributes(Enum):
     report_deadline_hard = 402
 
 class SmartEzbench:
+    @classmethod
+    def list_reports(cls, ezbench_dir, updatedSince = 0):
+        log_dir = ezbench_dir + '/logs'
+        state_files = glob.glob("{}/**/smartezbench.state".format(log_dir), recursive=True)
+
+        reports = []
+        for state_file in state_files:
+            if updatedSince > 0 and os.path.getmtime(state_file) < updatedSince:
+                continue
+
+            start = len(log_dir) + 1
+            stop = len(state_file) - 19
+            reports.append(state_file[start:stop])
+
+        return reports
+
     def __init__(self, ezbench_dir, report_name, readonly = False,
                  hook_binary_path = None, logs_callback = None,
                  hooks_callback = None):

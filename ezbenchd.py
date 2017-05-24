@@ -344,7 +344,7 @@ def sbench_run(report_name):
 lastPoll = 0
 while not stop_requested:
     futureLastPoll = time.time()
-    reports = list_smart_ezbench_report_names(ezbench_dir, lastPoll)
+    reports = SmartEzbench.list_reports(ezbench_dir, lastPoll)
     lastPoll = futureLastPoll
     for report_name in reports:
         try:
