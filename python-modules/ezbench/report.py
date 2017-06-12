@@ -403,6 +403,7 @@ class TestRun:
 
     def importImgTestRun(self, runFile):
         with open(runFile, 'rt') as f:
+            line_cnt = 0
             for line in f:
                 split = line.split(',')
                 if len(split) == 2:
@@ -410,6 +411,9 @@ class TestRun:
                     frame_file = split[1].strip()
                     fullpath = os.path.join(self.test_result.commit.report.log_folder, frame_file)
                     self.__add_result__(SubTestImage(frameid, fullpath, runFile))
+                else:
+                    raise ValueError("WARNING: Run file '{}' has an invalid format at line {}".format(runFile, line_cnt))
+                line_cnt += 1
             self.__add_result__(SubTestString("", "complete", runFile))
 
     def importUnifiedTestRun(self, runFile):
@@ -845,12 +849,21 @@ class TestResult:
                 self.test.unit = unit
 
             for i in range(0, len(runFiles)):
-                run = TestRun(self, testType, runFiles[i], metricsFiles[runFiles[i]], unit, data[i])
-                self.runs.append(run)
+                try:
+                    run = TestRun(self, testType, runFiles[i], metricsFiles[runFiles[i]], unit, data[i])
+                    self.runs.append(run)
+                except ValueError as e:
+                    print(e)
         else:
             for i in range(0, len(runFiles)):
-                run = TestRun(self, testType, runFiles[i], metricsFiles[runFiles[i]], None, None)
-                self.runs.append(run)
+                try:
+                    run = TestRun(self, testType, runFiles[i], metricsFiles[runFiles[i]], None, None)
+                    self.runs.append(run)
+                except ValueError as e:
+                    print(e)
+
+        if len(self.runs) == 0:
+            raise ValueError("WARNING: Invalid test result: No runs found for the test {} on commit {}".format(self.test.full_name, self.commit.full_sha1))
 
 
     def result(self, key = None):
@@ -1580,6 +1593,8 @@ class Report:
                         # Add the result to the commit's results
                         commit.results[test.full_name] = result
                         commit.compil_exit_code = RunnerErrorCode.NO_ERROR # The deployment must have been successful if there is data
+                    except ValueError as e:
+                        print(e)
                     except Exception as e:
                         traceback.print_exc(file=sys.stderr)
                         sys.stderr.write("\n")
