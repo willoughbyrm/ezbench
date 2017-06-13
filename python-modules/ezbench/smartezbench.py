@@ -225,6 +225,7 @@ class SmartEzbench:
         self.smart_ezbench_lock = self.log_folder + "/smartezbench.lock"
         self.smart_ezbench_log = self.log_folder + "/smartezbench.log"
         self._report_cached = None
+        self._first_run = False
         self._deleted = False
 
         self.state = dict()
@@ -239,16 +240,15 @@ class SmartEzbench:
         self.min_criticality = Criticality.II
 
         # Create the log directory
-        first_run = False
         if not readonly and not os.path.exists(self.log_folder):
             os.makedirs(self.log_folder)
-            first_run = True
+            self._first_run = True
 
         # Open the log file as append
         self.log_file = open(self.smart_ezbench_log, "a")
 
         # Add the welcome message
-        if first_run or not self.__reload_state():
+        if self._first_run or not self.__reload_state():
             if readonly:
                 raise RuntimeError("The report {} does not exist".format(report_name))
             self.__save_state()
@@ -488,6 +488,10 @@ class SmartEzbench:
         self.__release_lock()
 
         return True
+
+    # Return True if the reported got created by this instance of SmartEzbench
+    def first_run(self):
+        return self._first_run
 
     def profile(self):
         return self.__read_attribute__('profile')
