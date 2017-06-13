@@ -925,7 +925,7 @@ class SmartEzbench:
         if full_name not in task_tree[commit]["tests"]:
             return 0
 
-        rounds =  task_tree[commit]["tests"][full_name]['rounds']
+        rounds_before =  task_tree[commit]["tests"][full_name]['rounds']
         task_tree[commit]["tests"][full_name]['rounds'] -= rounds
 
         if task_tree[commit]["tests"][full_name]['rounds'] <= 0:
@@ -934,7 +934,7 @@ class SmartEzbench:
         if len(task_tree[commit]["tests"]) == 0:
             del task_tree[commit]
 
-        return rounds
+        return rounds_before
 
     @classmethod
     def __remove_existing_tasks_from_tree(cls, report, task_tree_user, task_tree_auto):
@@ -1130,9 +1130,8 @@ class SmartEzbench:
                         # The result is un-resumable, schedule a full run at the end
                         self._task_list.append(TaskEntry(e.commit, e.test, 1))
                     elif err_code == RunnerErrorCode.REBOOT_NEEDED:
+                        self.__done_running__(runner)
                         self.__call_hook__('reboot_needed', { "task": self._task_current })
-                        self._task_list = deque()
-                        self._task_current = None
                         self.__log(Criticality.II, "Rebooting...")
                         # We already closed the runner above, so
                         # create a temporary one for the reboot

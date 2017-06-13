@@ -1,0 +1,204 @@
+syntax = "proto3";
+package ezbench_controllerd;
+
+message ClientHello {
+    uint32 version = 1;
+    string machine_name = 2;
+}
+
+message ServerHello {
+    uint32 version = 1;
+    string controller_name = 2;
+}
+
+/* Commands from the DUT to the controller */
+message CmdPing {
+    bool requested = 1;
+}
+
+message ReportAttribute {
+    oneof attribute {
+        float event_min_confidence = 1;
+        uint32 schedule_max_commits = 100;
+        uint64 schedule_deadline_soft = 101;
+        uint64 schedule_deadline_hard = 102;
+        float perf_min_change = 200;
+        float variance_max = 300;
+        uint32 variance_max_run_count = 301;
+        uint32 variance_min_run_count = 302;
+        int32 report_priority = 400;
+        uint64 report_deadline_soft = 401;
+        uint64 report_deadline_hard = 402;
+    }
+}
+
+message Report {
+    string name = 1;
+    string description = 2;
+    string upload_url = 3;
+    string profile = 4;
+    repeated ReportAttribute attributes = 5;
+}
+
+message CmdDeleteReport {
+    string name = 1;
+}
+
+message TestExecution {
+    string name = 1;
+    uint32 rounds = 2;
+}
+
+message TestsetExecution {
+    string name = 1;
+    uint32 rounds = 2;
+}
+
+message CmdWorkCommit {
+    string id = 1;
+    repeated TestExecution tests = 2;
+    repeated TestsetExecution testsets = 3;
+}
+
+message CmdWork {
+    Report report = 1;
+    repeated CmdWorkCommit commits = 2;
+}
+
+message Cmd {
+    uint64 id = 1;
+    oneof submsg {
+        CmdPing ping = 2;
+        CmdWork set_work = 3;
+        CmdDeleteReport delete_report = 4;
+        /* CmdForceUpload --> only to be used when report in DONE state */
+  }
+}
+
+/* Information coming from the DUTs */
+message ReportState {
+    string name = 1;
+    string profile = 2;
+
+    string state = 10;
+    string state_disk = 11;
+
+    float build_time = 20;
+    float deploy_time = 21;
+}
+
+message SigMoreLog {
+    string report = 1;
+    string msg = 2;
+}
+
+message AvailableReports {
+    /* WARNING: Work around a bug in protobuf that does not like sending
+       empty messages and will instead send ... nothing
+    */
+    uint32 report_count = 1;
+    repeated ReportState reports = 2;
+}
+
+message AvailableTests {
+    message Test {
+        string name = 1;
+        float exec_time_max = 2;
+        float exec_time_median = 3;
+    }
+
+    /* WARNING: Work around a bug in protobuf that does not like sending
+       empty messages and will instead send ... nothing
+    */
+    uint32 tests_count = 1;
+    repeated Test tests = 2;
+}
+
+message AvailableTestsets {
+    message Testset {
+        string name = 1;
+        string description = 2;
+        repeated TestExecution tests = 3;
+    }
+
+    /* WARNING: Work around a bug in protobuf that does not like sending
+       empty messages and will instead send ... nothing
+    */
+    uint32 testsets_count = 1;
+    repeated Testset testsets = 2;
+}
+
+message CmdStatus {
+    enum CmdErrorCode {
+            NON_ACK = 0;
+            OK = 1;
+            ERROR = 2;
+            WARNING = 3;
+    }
+    uint64 id = 1;
+    CmdErrorCode err_code = 2;
+    string err_msg = 3;
+}
+
+message SigReportPushed {
+    string report = 1;
+}
+
+message SigReboot {
+    double timestamp = 1;
+}
+
+message Signal {
+    oneof submsg {
+        CmdStatus cmd_status = 1;
+        AvailableReports reports = 2;
+        AvailableTests tests = 3;
+        AvailableTestsets testsets = 4;
+        SigMoreLog log = 5;
+        SigReportPushed report_pushed = 6;
+        SigReboot reboot = 7;
+
+        // TODO: AvailableProfiles
+        // TODO: StateChanged
+        // TODO: Tasklist changed
+        // TODO: ReportPushed
+    }
+}
+
+/* disk storage */
+message QueuedCmd {
+    Cmd cmd = 1;
+    CmdStatus status = 2;
+
+    double last_sent = 3;
+    double acknowledged = 4;
+}
+
+message MachineState {
+    string name = 1;
+    uint64 last_seen = 2;
+    float ping = 3;
+
+    uint64 next_cmd_id = 40;
+    repeated QueuedCmd queued_cmds = 41;
+    uint64 recv_sig_count = 42;
+
+    AvailableReports reports = 50;
+    AvailableTests tests = 51;
+    AvailableTestsets testsets = 52;
+}
+
+message Job {
+    string id = 1;
+    Report report = 2;
+
+    // TODO: have the report_create command linked with the machine?
+    repeated string machines = 3;
+
+    repeated CmdWorkCommit commits = 4;
+}
+
+message FullState {
+    repeated MachineState machines = 1;
+    repeated Job jobs = 2;
+}

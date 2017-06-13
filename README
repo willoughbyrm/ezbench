@@ -396,3 +396,131 @@ whenever a mode change happens:
 		print(s.format(os.environ['ezbench_report_name'],
 		               os.environ['ezbench_report_mode_prev'],
 		               os.environ['ezbench_report_mode']))
+
+== Multi-node support ==
+
+Ezbench can be operated on multiple machines at the same time. In this case,
+each machine will still bisect independently of what others are doing, in order
+to maxime throughput.
+
+Clients queuing work will do so using a REST interface which is exported by
+controllerd.py. Work can be queued in multiple jobs, which can have their own
+priority, allowing you to prioritize some tasks above others.
+
+The different DUTs connect to controllerd.py by using dutd.py, which replaces
+ezbenchd.py. Dutd.py receives the commands from the controller and update it as
+for its current status.
+
+Reports coming out of ezbench will be sent from the DUT to the controller using
+git. The git URL is then shared with the original client, who can then clone and
+pull from it as updates come.
+
+Here are more details about the different components.
+
+=== Controllerd.py ===
+
+==== Dependencies ====
+
+Mandatory:
+ - python3
+ - bottle : REST server
+ - pygit2 : Git integration (based on libgit2)
+
+==== Configuration ====
+
+Controllerd is configured using a configuration file. Its default location is
+/etc/ezbench/controllerd.ini, which can be overriden with the command line
+argument --conf.
+
+Here is a sample of the configuration file:
+
+    [General]
+    # Name: Name you want to give to this controller
+    Name = MyController
+
+    # StateFile: File containing the permanent state on controllerd.
+    StateFile = /var/lib/controllerd/controllerd.state
+
+    # StateFileLock: Lock file protecting the state file.
+    StateFileLock = /var/lib/controllerd/controllerd.lock
+
+
+    [RESTServer]
+    # BindAddress: Address to bind for the public-facing REST server
+    BindAddress = 0.0.0.0:8080
+
+
+    [DUTServer]
+    # BindAddress: Address to bind for the DUT-facing TCP server
+    BindAddress = 0.0.0.0:42000
+
+
+    [Reports]
+    # ReportsBaseURL: Base URL for the read-only public-facing git repos that
+    #                  contain the reports from the different jobs and machines.
+    ReportsBaseURL = git://anongit.company.com/ezbench_reports
+
+    # ReportsBasePath: Base path to where reports should be stored
+    ReportsBasePath = /opt/ezbench/dut-reports
+
+
+    [Repos]
+    # GitRepoPath: Full path to the repo that will contain the different
+    #              git histories used by the DUTs for testing
+    GitRepoPath = /opt/sources/dut-repo
+
+
+==== REST Interface ====
+
+TODO: Check out unit_tests/controllerd.py.
+
+=== Dutd.py ===
+
+==== Dependencies ====
+
+Same dependencies as ezbench.py.
+
+==== Configuration ====
+
+Dutd is configured using a configuration file. Its default location is
+/etc/ezbench/dutd.ini, which can be overriden with the command line
+argument --conf.
+
+Here is a sample of the configuration file:
+
+    [General]
+    # Name: Name of this machine. By default, the hostname of the machine
+    #       will be used.
+    # Name =
+
+
+    [Controller]
+    # Address: Address of the controller. Format: host:port.
+    Host = controller:42000
+
+    # ReportsBaseURL: Base git URL that will be used to push the reports to
+    #                the controller.
+    ReportsBaseURL = dut@controller:/opt/ezbench/dut-reports
+
+    # GitRepoURL: The URL to the controller's repo that holds all the versions
+    #             that need to be tested locally.
+    GitRepoURL = dut@controller:/opt/sources/dut-repo
+
+    # Use one of the following methods
+    [ControllerCredentials]
+    # User: User to use for the authentication. If no password not key is
+    #       specified, the SSH agent will be queried
+    User = dut
+
+    # SSHKeyPriv: Use the following ssh key
+    #SSHKeyPriv = /home/ezbench/.ssh/id_rsa
+
+    # SSHKeyPub: Use the following ssh key
+    #SSHKeyPub = /home/ezbench/.ssh/id_rsa.pub
+
+    # SSHKeyPassphrase: Use the following passphrase to decrypt the key
+    #SSHKeyPassphrase = mypassphrase
+
+    # Password: Use the following tuple for authentication
+    #Password = password
+
