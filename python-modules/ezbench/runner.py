@@ -426,6 +426,10 @@ class Runner:
         if self.runner is not None:
             self.__send_command__("done")
             self.runner.wait()
+            self.runner.stdin.close()
+            self.runner.stdout.close()
+            if self.runner.stderr is not None:
+                self.runner.stderr.close()
             self.runner = None
 
     def list_cached_versions(self):
