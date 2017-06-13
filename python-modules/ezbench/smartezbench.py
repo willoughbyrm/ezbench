@@ -217,7 +217,7 @@ class SmartEzbench:
         self.readonly = readonly
         self.ezbench_dir = ezbench_dir
         self.report_name = report_name
-        self.log_folder = ezbench_dir + '/logs/' + report_name
+        self.log_folder = os.path.abspath(ezbench_dir + '/logs/' + report_name)
         self.hook_binary_path = hook_binary_path
         self.logs_callback = logs_callback
         self.hooks_callback = hooks_callback
@@ -238,6 +238,11 @@ class SmartEzbench:
         self._events_str = None
 
         self.min_criticality = Criticality.II
+
+        # Verify that the absolute path actually starts with ezbench_dir + '/logs/'
+        base_path = os.path.abspath(ezbench_dir + '/logs/')
+        if not self.log_folder.startswith(base_path):
+            raise ValueError("Invalid report name")
 
         # Create the log directory
         if not readonly and not os.path.exists(self.log_folder):
