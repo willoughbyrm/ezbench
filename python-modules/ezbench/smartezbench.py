@@ -595,7 +595,12 @@ class SmartEzbench:
         return total_rounds_before, total_rounds_after
 
     def __add_test_unlocked__(self, commit, test, rounds, user_requested=True):
-        scm = self.repo()
+        try:
+            scm = self.repo()
+        except RunnerError as e:
+            self.__log(Criticality.EE, "add_test: unknown repository {}".format(e))
+            return 0
+
         if scm is not None:
             commit = scm.full_version_name(commit)
 
