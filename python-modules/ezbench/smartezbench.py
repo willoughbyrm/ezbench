@@ -316,13 +316,14 @@ class SmartEzbench:
     def __grab_lock(self):
         if self.readonly:
             return
-        self.lock_fd = open(self.smart_ezbench_lock, 'w')
+
         try:
+            self.lock_fd = open(self.smart_ezbench_lock, 'w')
             fcntl.flock(self.lock_fd, fcntl.LOCK_EX)
             return True
         except IOError as e:
             self.__log(Criticality.EE, "Could not lock the report: " + str(e))
-            return False
+            raise ValueError("Can't lock the report")
 
     def __release_lock(self):
         if self.readonly:
