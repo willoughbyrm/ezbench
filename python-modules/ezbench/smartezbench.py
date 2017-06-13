@@ -33,6 +33,7 @@ import multiprocessing
 import statistics
 import subprocess
 import threading
+import shutil
 import pprint
 import fcntl
 import time
@@ -224,6 +225,7 @@ class SmartEzbench:
         self.smart_ezbench_lock = self.log_folder + "/smartezbench.lock"
         self.smart_ezbench_log = self.log_folder + "/smartezbench.log"
         self._report_cached = None
+        self._deleted = False
 
         self.state = dict()
         self.state['commits'] = dict()
@@ -253,6 +255,19 @@ class SmartEzbench:
             self.__log(Criticality.II,
                     "Created report '{report_name}' in {log_folder}".format(report_name=report_name,
                                                                             log_folder=self.log_folder))
+
+    def delete(self):
+        self.__grab_lock()
+
+        if not shutil.rmtree.avoids_symlink_attacks:
+            self.__log(Criticality.WW, "Deleting the report unsafely (symlink attack)")
+        else:
+            self.__log(Criticality.II, "Deleting the report({}) safely".format(self.log_folder))
+        shutil.rmtree(self.log_folder)
+
+        self._deleted = True
+
+        self.__release_lock()
 
     def __log(self, error, msg):
         time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -950,7 +965,7 @@ class SmartEzbench:
             return False
 
         # Start generating runner calls
-        while len(self._task_list) > 0:
+        while len(self._task_list) > 0 and not self._deleted:
             running_mode = self.running_mode(check_running = False)
             if running_mode != RunningMode.RUN:
                 self.__log(Criticality.II,
@@ -978,6 +993,10 @@ class SmartEzbench:
             # Start the task
             self._task_current.started()
             for r in range(0, e.rounds):
+                # Early exit if the report has been deleted
+                if self._deleted:
+                    break
+
                 self.__call_hook__('start_running_test', { "task": self._task_current })
 
                 self._task_lock.release()
