@@ -427,7 +427,11 @@ class GitRepo:
         """
 
         try:
-            return str(self.repo.revparse_single(version).oid)
+            rev = self.repo.revparse_single(version)
+            if type(rev) == pygit2.Tag:
+                return str(rev.target.hex)
+            else:
+                return str(rev.oid)
         except:
             return version
 
