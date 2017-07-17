@@ -892,10 +892,9 @@ class SmartEzbench:
 
         self.__reload_state(keep_lock=True)
         try:
-            running_state=self.__running_mode_unlocked__()
-            if running_state == RunningMode.INITIAL or running_state == RunningMode.RUNNING:
-                self.__write_attribute_unlocked__('mode', RunningMode.RUN.value, allow_updates = True)
-                self.__log(Criticality.II, "Ezbench running mode set to RUN")
+            running_state=self.__running_mode_unlocked__(check_running=False)
+            if running_state == RunningMode.INITIAL:
+                self.__set_running_mode_unlocked__(RunningMode.RUN)
                 ret = True
             elif running_state != RunningMode.RUN:
                 self.__log(Criticality.II,
