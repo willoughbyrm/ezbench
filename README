@@ -35,6 +35,7 @@ You may specify whatever name you want by adding -N <name> to the command line.
 This is very useful when testing kernel-related stuff as we need to reboot on
 a new kernel to test a new commit.
 
+
 === Dependencies ===
 
 The real core of ezbench requires:
@@ -61,8 +62,9 @@ To get visual feedback when compiling, you will need:
 
 If you want to use specify which compositor should be run, you will need to
 install the following applications:
- - unbuffer
+ - unbuffer (part of expect package)
  - wmctrl
+
 
 === Configuration ===
 
@@ -84,7 +86,28 @@ for example allows users to specify which compositor should be used.
 If core.sh is currently running and you want to stop its execution after the next
 test, you can create a file named 'requestExit' in the log folder.
 
+
 === Core.sh examples ===
+
+You can use following steps to validate that ezbench is correctly
+configured and working; it finds tests, it can run them, it can build
+the software stack and it can do bisection.
+
+WARNING: running core.sh directly is deprecated. You can skip to
+ezbench section.
+
+
+==== Listing tests ====
+
+This lists all supported tests and their configurations:
+    ./core.sh -l | tr ' ' '\n'
+
+
+==== Running tests ====
+
+This runs a single test without building anything:
+    WIP
+
 
 ==== Testing every patchset of a series ====
 
@@ -111,6 +134,7 @@ profile you are using. To do so, use -c like in the following example:
 
     ./core.sh -P mesa -b synmark:Gl21Batch2$ -r 3 -c confs.d/x11_comp/kwin HEAD
 
+
 ==== Retrospectives ====
 
 Here is an example of how to generate a retrospective. The interesting part is
@@ -122,6 +146,7 @@ the call to utils/get_commit_list.py which generates a list of commits
                  -b unigine:valley:1080p:fullscreen -r 3 \
                  -m "./recompile-release.sh" \
                  `utils/get_commit_list.py -p ~/repos/mesa -s 2014-12-01 -i "1 week"`
+
 
 ==== Giving a large list of tests to core.sh ====
 
@@ -136,6 +161,7 @@ Here is an example:
     test5000
     EOF (Ctrl + D)
 
+
 == ezbench ==
 
 This tool is meant to make the usage of core.sh easy and support testing
@@ -148,15 +174,24 @@ the execution of this report.
 This tool uses core.sh as a backend for checking that the commits SHA1 and tests
 do exist so you are sure that the work can be executed when the time comes.
 
+
 === Dependencies ===
 
- - python3
- - dateutils
+Python3 modules:
+ - dateutil
  - numpy
  - scipy
  - pygit2
 
+
 === Examples ===
+
+==== Listing available tests ====
+
+The ezbench program allows you to list the available tests by running:
+
+    ./ezbench -l
+
 
 ==== Creating a report ====
 
@@ -165,6 +200,7 @@ a performance report named 'mesa-tracking-pub-benchmarks', using the core.sh
 profile 'mesa', you need to run the following command:
 
     ./ezbench -p mesa mesa-tracking-pub-benchmarks
+
 
 ==== Adding benchmarks runs ====
 
@@ -183,12 +219,14 @@ made that it would also work across reboots which is good when testing kernels:
               -c "`utils/get_commit_list.py -p ~/repos/mesa -s 2014-12-01 -i "1 week"`"
               mesa-tracking-pub-benchmarks
 
+
 ==== Checking the status of a report ====
 
 You can check the status of the 'mesa-tracking-pub-benchmarks' report by calling
 the following command:
 
     ./ezbench mesa-tracking-pub-benchmarks status
+
 
 ==== Changing the execution status of the report ====
 
@@ -204,6 +242,7 @@ need to run the following command:
  executing any benchmarks from this report. The difference between the "pause"
  and "abort" states is mostly for humans, to convey the actual intent.
 
+
 ==== Starting collecting data without ezbenchd.py ====
 
 If you are not using ezbenchd.py, you may simply run the following command to
@@ -212,6 +251,7 @@ start collecting data:
     ./ezbench mesa-tracking-pub-benchmarks start
 
 This command will automatically change the state of the report to "run".
+
 
 == utils/owatch/owatch ==
 
@@ -225,12 +265,14 @@ This tool is only used by the tests that explicitly invoke it, it
 won't be used automatically for anything. An example is
 tests.d/piglit/igt.test.
 
+
 === Dependencies ===
 
  - gcc
  - make
 
-== utils/ezbenchd.py ==
+
+== ezbenchd.py ==
 
 This tool monitors the ezbench reports created using the "ezbench" command and
 runs them if their state is right (state == RUN). It also schedules improvements
@@ -238,19 +280,26 @@ when the run is over before moving on to the next report. It thus allow for
 collaborative sharing of the machine by different reports, as long as they
 make sure not to change the global state.
 
+
 === Dependencies ===
 
  - ezbench.py
 
+Python3 modules:
+ - mako
+
+
 === Examples ===
 
-Simply running utils/ezbenchd.py is enough to run all reports which are
-currently in the state "RUN".
+Simply running ezbenchd.py is enough to run all reports which are
+currently in the state "RUN", and set up an HTTP server to allow
+interacting with ezbenchd and see results.
 
     ./ezbench -p mesa mesa-tracking-pub-benchmarks
     ./ezbench -r 2 -b GLB27:Egypt:offscreen -c HEAD mesa-tracking-pub-benchmarks
     ./ezbench mesa-tracking-pub-benchmarks run
-    utils/ezbenchd.py
+    ./ezbenchd.py  --http_server=0.0.0.0:8080
+
 
 === Systemd integration ===
 
@@ -271,6 +320,7 @@ an http server listening on all interfaces on the port 8080.
 
 	[Install]
 	WantedBy=multi-user.target
+
 
 === Nightly tests ===
 
