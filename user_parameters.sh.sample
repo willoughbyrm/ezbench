@@ -25,7 +25,7 @@ REPO_MESA_PARAMETERS="--prefix=\$REPO_MESA_PREFIX \
     --enable-llvm-shared-libs \
     --enable-egl \
     --enable-gbm \
-    --enable-gallium-llvm \
+    --enable-llvm \
     --enable-shared-glapi \
     --enable-glx \
     --enable-glx-tls \
