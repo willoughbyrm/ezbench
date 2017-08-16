@@ -454,7 +454,7 @@ class SmartEzbench:
     def __reload_state(self, keep_lock=False):
         self.__grab_lock()
 
-        if self.state_lock.ref_cnt() == 1:
+        if self.state_lock.ref_cnt() == 1 or self.readonly:
             ret = self.__reload_state_unlocked()
         else:
             print("WARNING: Recursive call to __reload_state()")
