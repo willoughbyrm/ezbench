@@ -70,7 +70,7 @@ function __igt_run__ {
     if [ -n "$PIGLITCONF" ]; then
 	ABORTFLAG="--abort-on-monitored-error"
     fi
-    local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $OWATCH $REPO_PIGLIT/piglit run $PIGLITCONF $ABORTFLAG $PIGLIT_RUN_PARAMS -s $parameters $testlist tests/igt.py ${piglit_output}"
+    local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $OWATCH $REPO_PIGLIT/piglit run $PIGLITCONF $ABORTFLAG $PIGLIT_RUN_PARAMS -s --ignore-missing $parameters $testlist tests/igt.py ${piglit_output}"
 
     ENV_DUMP_REQUIRE_ARGUMENT="$REPO_PIGLIT/piglit" \
     ENV_DUMP_NO_METRICS=1 \
