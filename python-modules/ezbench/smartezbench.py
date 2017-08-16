@@ -1134,8 +1134,11 @@ class SmartEzbench:
                         self._task_list = deque()
                         self._task_current = None
                         self.__log(Criticality.II, "Rebooting...")
-                        runner.reboot()
-                        sys.exit(0)
+                        # We already closed the runner above, so
+                        # create a temporary one for the reboot
+                        Runner(self.ezbench_dir).reboot()
+                        # Just in case the reboot() returned
+                        os._exit(0)
                     elif (err_code.value != RunnerErrorCode.NO_ERROR and
                           err_code.value < RunnerErrorCode.COMP_DEP_UNK_ERROR.value):
                         # Error we cannot do anything about, probably a setup issue
