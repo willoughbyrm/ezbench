@@ -819,7 +819,7 @@ if [ "$cmd" == "reboot" ]; then
     if [ -x "$owatchbin" ]; then
 	owcmdline="$owatchbin $WATCHDOG_TIMEOUT_SYNC"
     fi
-    $owdcmdline sync
+    $owcmdline sync
 
     # Use reboot_wd to time out with a power off.
     rwdbin="$ezBenchDir/utils/reboot_wd/reboot_wd"
