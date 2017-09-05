@@ -21,6 +21,7 @@ REPO_MESA_PARAMETERS="--prefix=\$REPO_MESA_PREFIX \
     --with-dri-driverdir=\$REPO_MESA_PREFIX/lib/dri \
     --with-gallium-drivers=r300,r600,radeonsi,nouveau,svga,swrast \
     --with-dri-drivers=i915,i965,r200,radeon,nouveau,swrast \
+    --with-vulkan-drivers=intel \
     --with-egl-platforms=x11,drm,wayland \
     --enable-llvm-shared-libs \
     --enable-egl \
@@ -59,6 +60,16 @@ LIBFRAMETIME32_SO=/usr/lib32/libframetime.so
 APITRACE_BINARY=/usr/bin/apitrace
 GLRETRACE_BINARY=/usr/bin/glretrace
 APITRACE_TRACE_FOLDER=/opt/benchmarks/apitraces
+
+# vkreplay is part of VulkanTools repository tools:
+#   https://github.com/LunarG/VulkanTools/blob/master/BUILDVT.md
+VKREPLAY_BINARY=/usr/bin/vkreplay
+# VulkanTools screenshot layer location (needed for validation) for Vulkan loader
+export VK_LAYER_PATH=/usr/lib/VulkanTools/layersvt/
+# Traces and files listing which frame in them is to be validated are named as:
+#   validate:<name>.vktrace
+#   validate:<name>.vktrace.frames
+VKREPLAY_TRACE_FOLDER=/opt/benchmarks/vktraces/
 
 # UE4 parameters
 UE4_FOLDER="/opt/benchmarks/Unreal Engine 4"
