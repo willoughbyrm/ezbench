@@ -1,0 +1,61 @@
+# Parameters:
+# - VKREPLAY_BINARY: VulkanTools tool for replaying traces
+# - VKREPLAY_TRACE_FOLDER
+#
+# This folder should contain:
+# - trace files named as: validate:<name>.vktrace
+# - trace frame files named as: validate:<name>.vktrace.frames
+#   (these list which frame(s) to dump/validate from a trace)
+
+test -d "${VKREPLAY_TRACE_FOLDER}" || return 1
+test -x "${VKREPLAY_BINARY}" || return 1
+
+# 2 arguments: $trace $frames
+function __vkreplay_validate_run__ {
+    local trace=$1
+    local frame=$2
+    local oldname
+    local newname
+    local sha
+    output=${run_log_file}_tmp
+
+    mkdir -p "$output"
+    pushd "$output" >/dev/null
+
+    ENV_DUMP_RESTRICT_TO_BINARY="none" \
+    run_bench 0 "${VKREPLAY_BINARY}" -s ${frame}-1-1 -o "$trace" >/dev/null 2>&1
+    oldname=$frame.ppm
+    test -f "$oldname" || echo "ERROR: no image; Vulkan replay failure, or screenshot layer missing!"
+
+    # store file under its own SHA to get free de-duplication
+    sha=$(sha1sum $oldname | cut -d' ' -f1)
+    newname=$sha.png
+    convert $oldname ../$newname
+
+    echo "$frame,$newname"
+
+    popd >/dev/null
+    rm "$output/"*
+    rmdir "$output"
+}
+
+
+for framefile in "${VKREPLAY_TRACE_FOLDER}/validate:"*.frames; do
+	trace=${framefile%.frames}
+	test -f "$trace" || continue
+	frame=$(head -1 $framefile)
+	name="vkreplay:$(basename ${trace%.vktrace})"
+	eval "${name}_run() { __vkreplay_validate_run__ $trace $frame; }"
+
+	test_name="$test_name $name"
+done
+
+# can't know how much arbitrary trace file takes
+test_exec_time=10
+
+# smaller diff is better
+test_invert=1
+
+# for image validation
+test_unit="imgs"
+test_type="imgval"
