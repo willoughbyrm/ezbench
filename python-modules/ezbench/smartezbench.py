@@ -710,6 +710,7 @@ class SmartEzbench:
         exit_code = 1
         task_tree = list()
         events_str = []
+        resumable_tasks = []
 
         # Make sure we catch *any* error, because we need to send stuff in the
         # Queue if we do not want the parent process to get stuck
