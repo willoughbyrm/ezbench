@@ -1,46 +1,75 @@
+# Parameters:
+# - APITRACE_BINARY: path to Apitrace binary used for trace replay
+# - GLRETRACE_BINARY: path to Apitrace glretrace binary, used for restricting enviroment dumps
+# - APITRACE_TRACE_FOLDER
+#
+# Trace folder should contain:
+# - trace files named as: <name>.trace
+# - trace validation frame files named as: <name>.trace.validate
+#   - contains comma separated list of IDs for frames to validate
+# Note: Frames in the list are identified by their Apitrace GL/ES call numbers!
+#
+# For example:
+# - dota2-tutorial:1080p:high.trace
+# - dota2-tutorial:1080p:high.trace.validate
+#
+# Convention is to separate test-case name, resolution and render quality level
+# in <name> with a colon character.
+
 test -e "${APITRACE_BINARY}" || return 1
 test -e "${GLRETRACE_BINARY}" || return 1
 
 # 1 argument: $trace
 function __apitrace_validate_run__ {
     local trace=$1
+    local image
+    local sha
+    local ext
+    local filename
+    local frameid
     output=${run_log_file}_tmp
 
     mkdir -p "$output"
 
     ENV_DUMP_RESTRICT_TO_BINARY="${GLRETRACE_BINARY}" \
     run_bench 0 "${APITRACE_BINARY}" dump-images \
-    --calls "$(cat "$trace.calls.txt")" \
+    --calls "$(head -1 $trace.validate)" \
     -o "$output/frame" "$trace" > /dev/null 2>&1
 
-    for result in "$output/frame"*; do
-        test -f "$result" || continue
-        test -f "$trace.calls.txt" || continue
-
+    for image in "$output/frame"*; do
         # Do not store the file as ${run_log_file}.${frameid} because we may
         # get a lot of duplication. Instead, store it under its own SHA to
         # get free de-duplication
-        filename=$(sha1sum "$result" | cut -d" " -f1)."${result##*.}"
-        frame=$(dirname "$run_log_file")/"$filename"
-        frameid=$(echo "$result" | sed "s/.*frame0*//g" | sed "s/\..*//g")
+	ext=${image##*.}
+	sha=$(sha1sum $image | cut -d' ' -f1)
+	filename=$(dirname "$run_log_file")/$sha.$ext
+	# extract id from middle of dumped image name
+        frameid=$(echo "$image" | sed -e "s/.*frame0*//g" -e "s/\..*//g")
 
-        cp "$result" "$frame"
-        echo "$frameid","$filename"
+        mv "$image" "$filename"
+        echo "$frameid","$sha.$ext"
     done
 
-    rm "$output/"*
-    rmdir "$output"
+    rm -r "$output"
 }
 
-for trace in "${APITRACE_TRACE_FOLDER}/validate:"*.trace; do
+for framefile in "${APITRACE_TRACE_FOLDER}/"*.validate; do
+    trace=${framefile%.validate}
     test -f "$trace" || continue
 
-    name="apitrace:$(basename ${trace%.*})"
+    name=${trace##*/}
+    name="apitrace:validate:${name%.trace}"
     eval "${name}_run() { __apitrace_validate_run__ ${trace}; }"
+
     test_name="$test_name ${name}"
 done
 
+# can't know how much arbitrary trace file takes
 test_exec_time=10
+
+# smaller diff is better
 test_invert=1
+
+# for image validation
 test_unit="imgs"
 test_type="imgval"
