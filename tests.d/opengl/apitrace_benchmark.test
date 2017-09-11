@@ -1,25 +1,52 @@
+# Parameters:
+# - APITRACE_BINARY: path to Apitrace binary used for trace replay
+# - GLRETRACE_BINARY: path to Apitrace glretrace binary, used for restricting enviroment dumps
+# - APITRACE_TRACE_FOLDER
+#
+# Trace folder should contain:
+# - trace files named as: <name>.trace
+# - trace performance frame files named as: <name>.trace.benchmark
+#   - contains comma separated list of IDs for frames to benchmark
+# Note:
+# - Frames in the list are identified by their Apitrace GL/ES call numbers!
+# - For now, only first specified frame is benchmarked
+#
+# For example:
+# - dota2-tutorial:1080p:high.trace
+# - dota2-tutorial:1080p:high.trace.benchmark
+#
+# Convention is to separate test-case name, resolution and render quality level
+# in <name> with a colon character.
+
 test -e "${APITRACE_BINARY}" || return 1
 test -e "${GLRETRACE_BINARY}" || return 1
 
 # 1 argument: $trace
 function __apitrace_benchmark_run__ {
     local trace=$1
+    local callid
     output=${run_log_file}_tmp
 
-    # FIXME: make sure the directory got created
     mkdir -p "$output"
+
+    # for now, supports only single frame benchmarking
+    callid=$(head -1 $trace.benchmark | cut -d, -f1)
 
     ENV_DUMP_RESTRICT_TO_BINARY="${GLRETRACE_BINARY}" \
     run_bench 0 "${APITRACE_BINARY}" replay -b --fullscreen \
-    --loop="$(cat "$trace.loop.txt")" "$trace" | cut -d" " -f9
+    --loop="$callid" "$trace" | cut -d" " -f9
+
+    rm -r "$output"
 }
 
-for trace in "${APITRACE_TRACE_FOLDER}/benchmark:"*.trace; do
+for framefile in "${APITRACE_TRACE_FOLDER}/"*.benchmark; do
+    trace=${framefile%.benchmark}
     test -f "$trace" || continue
-    test -f "$trace.loop.txt" || continue
 
-    name="apitrace:$(basename ${trace%.*})"
+    name=${trace##*/}
+    name="apitrace:benchmark:${name%.trace}"
     eval "${name}_run() { __apitrace_benchmark_run__ ${trace}; }"
+
     test_name="$test_name ${name}"
 done
 
