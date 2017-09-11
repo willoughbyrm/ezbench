@@ -2,18 +2,24 @@
 # - VKREPLAY_BINARY: VulkanTools tool for replaying traces
 # - VKREPLAY_TRACE_FOLDER
 #
-# This folder should contain:
-# - trace files named as: validate:<name>.vktrace
-# - trace frame files named as: validate:<name>.vktrace.frames
-#   (these list which frame(s) to dump/validate from a trace)
+# Trace folder should contain:
+# - trace files named as: <name>.vktrace
+# - trace frame files named as: <name>.vktrace.validate
+#   - contains comma separated list of frames to validate
+# For example:
+# - dota2-tutorial:1080p:high.vktrace
+# - dota2-tutorial:1080p:high.vktrace.validate
+#
+# Convention is to separate test-case name, resolution and render quality level
+# in <name> with a colon character.
 
 test -d "${VKREPLAY_TRACE_FOLDER}" || return 1
 test -x "${VKREPLAY_BINARY}" || return 1
 
-# 2 arguments: $trace $frames
+# 1 argument: $trace
 function __vkreplay_validate_run__ {
     local trace=$1
-    local frame=$2
+    local frame
     local oldname
     local newname
     local sha
@@ -22,10 +28,16 @@ function __vkreplay_validate_run__ {
     mkdir -p "$output"
     pushd "$output" >/dev/null
 
+    # for now, vktrace supports just one frame
+    frame=$(head -1 "${trace}.validate"|cut -d, -f1)
+
     ENV_DUMP_RESTRICT_TO_BINARY="none" \
-    run_bench 0 "${VKREPLAY_BINARY}" -s ${frame}-1-1 -o "$trace" >/dev/null 2>&1
+        run_bench 0 "${VKREPLAY_BINARY}" -s ${frame}-1-1 -o "$trace" >/dev/null 2>&1
     oldname=$frame.ppm
-    test -f "$oldname" || echo "ERROR: no image; Vulkan replay failure, or screenshot layer missing!"
+    if [ \! -f "$oldname" ]; then
+        touch "$oldname"
+	echo "ERROR: no image; Vulkan replay failure, or screenshot layer missing!" 1>&2
+    fi
 
     # store file under its own SHA to get free de-duplication
     sha=$(sha1sum $oldname | cut -d' ' -f1)
@@ -35,19 +47,18 @@ function __vkreplay_validate_run__ {
     echo "$frame,$newname"
 
     popd >/dev/null
-    rm "$output/"*
-    rmdir "$output"
+    rm -r "$output"
 }
 
+for framefile in "${VKREPLAY_TRACE_FOLDER}/"*.validate; do
+    trace=${framefile%.validate}
+    test -f "$trace" || continue
 
-for framefile in "${VKREPLAY_TRACE_FOLDER}/validate:"*.frames; do
-	trace=${framefile%.frames}
-	test -f "$trace" || continue
-	frame=$(head -1 $framefile)
-	name="vkreplay:$(basename ${trace%.vktrace})"
-	eval "${name}_run() { __vkreplay_validate_run__ $trace $frame; }"
+    name=${trace##*/}
+    name="vkreplay:validate:${name%.vktrace}"
+    eval "${name}_run() { __vkreplay_validate_run__ ${trace}; }"
 
-	test_name="$test_name $name"
+    test_name="$test_name $name"
 done
 
 # can't know how much arbitrary trace file takes
