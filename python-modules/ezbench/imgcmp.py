@@ -13,7 +13,7 @@ def __run_command__(cmd):
 
         return pipe.returncode, stdout, stderr
     except Exception as e:
-        print("compare_image: Failed to run the command '{}': {}".format(cmd, e))
+        print("imgcmp.py: Failed to run the command '{}': {}".format(cmd, e))
         return -1, "", ""
 
 def compare_image(image1, image2, metric, output):
