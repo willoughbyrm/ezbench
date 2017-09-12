@@ -15,7 +15,8 @@ shift
 # Add the exit code
 if [[ "$dump_file" != "stderr" ]]
 then
-	LD_PRELOAD="$so_path:$LD_PRELOAD" ENV_DUMP_FILE="$dump_file" ENV_DUMP_METRIC_FILE="$metrics_file" "$@"
+	LD_PRELOAD="$so_path::/usr/lib/libxcb-dri3.so:$LD_PRELOAD" ENV_DUMP_FILE="$dump_file" 
+ENV_DUMP_METRIC_FILE="$metrics_file" "$@"
 	exit_code=$?
 
 	# Do not add the EXIT_CODE line if it already exists. It means the file
