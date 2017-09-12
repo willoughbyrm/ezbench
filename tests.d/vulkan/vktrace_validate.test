@@ -19,34 +19,39 @@ test -x "${VKREPLAY_BINARY}" || return 1
 # 1 argument: $trace
 function __vkreplay_validate_run__ {
     local trace=$1
+    local image
     local frame
-    local oldname
+    local frames
     local newname
+    local imgcount
     local sha
     output=${run_log_file}_tmp
 
     mkdir -p "$output"
     pushd "$output" >/dev/null
 
-    # for now, vktrace supports just one frame
-    frame=$(head -1 "${trace}.validate"|cut -d, -f1)
+    # comma separated frame numbers
+    frames=$(head -1 "${trace}.validate")
 
-    run_bench 0 "${VKREPLAY_BINARY}" -s ${frame}-1-1 -o "$trace" >/dev/null 2>&1
-    oldname=$frame.ppm
-    if [ \! -f "$oldname" ]; then
-        touch "$oldname"
-	echo "ERROR: no image; Vulkan replay failure, or screenshot layer missing!" 1>&2
-    fi
+    run_bench 0 "${VKREPLAY_BINARY}" -s ${frames} -o "$trace" >/dev/null 2>&1
 
-    # store file under its own SHA to get free de-duplication
-    sha=$(sha1sum $oldname | cut -d' ' -f1)
-    newname=$sha.png
-    convert $oldname ../$newname
-
-    echo "$frame,$newname"
+    imgcount=0
+    for image in *.ppm; do
+        frame=${image%.ppm}
+        # store file under its own SHA to get free de-duplication
+        sha=$(sha1sum $image | cut -d' ' -f1)
+        newname=$sha.png
+        convert $image ../$newname
+        echo "$frame,$newname"
+	imgcount=$(($imgcount+1))
+    done
 
     popd >/dev/null
     rm -r "$output"
+
+    if [ $imgcount -eq 0 ]; then
+        echo "ERROR: no images - Vulkan replay failure, screenshot layer missing, or no screenshots specified!" 1>&2
+    fi
 }
 
 for framefile in "${VKREPLAY_TRACE_FOLDER}/"*.validate; do
