@@ -31,8 +31,7 @@ function __vkreplay_validate_run__ {
     # for now, vktrace supports just one frame
     frame=$(head -1 "${trace}.validate"|cut -d, -f1)
 
-    ENV_DUMP_RESTRICT_TO_BINARY="none" \
-        run_bench 0 "${VKREPLAY_BINARY}" -s ${frame}-1-1 -o "$trace" >/dev/null 2>&1
+    run_bench 0 "${VKREPLAY_BINARY}" -s ${frame}-1-1 -o "$trace" >/dev/null 2>&1
     oldname=$frame.ppm
     if [ \! -f "$oldname" ]; then
         touch "$oldname"
