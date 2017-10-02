@@ -1369,13 +1369,19 @@ class SmartEzbench:
                 event_prio = 1
                 test_name_to_run = str(e.full_name)
                 runs = min_run_count
+                # TODO: Remove this event and just return the merge base when
+                # asking for the bisect point of the change
             elif type(e) is EventDivergingBaseResult:
                 # Schedule the work
                 commit_sha1 = e.merge_base
                 severity = 1
                 event_prio = 1
-                test_name_to_run = str(e.full_name)
-                runs = len(e.result)
+                if (e.result.test.full_name == "ezbench_runner"):
+                    test_name_to_run = "no-op"
+                    runs = 1
+                else:
+                    test_name_to_run = str(e.full_name)
+                    runs = len(e.result)
             elif type(e) is EventBuildStatusChanged:
                 if e.commit_range.is_single_commit():
                     continue

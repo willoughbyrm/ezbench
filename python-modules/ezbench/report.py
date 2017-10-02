@@ -1114,6 +1114,8 @@ class EventCommitRange:
         Find the most suitable bisecting point in the associated commit graph.
         Ignore all the commits found as $ignore_commits.
 
+        TODO: Detect when the merge base needs to be tested
+
         Args:
             ignore_commits: commits to ignore, as they do not work (for instance)
 
@@ -1129,6 +1131,8 @@ class EventCommitRange:
         """
         Get the most suitable bisecting points in the associated commit graph.
         Ignore all the commits found as $ignore_commits.
+
+        TODO: Detect when the merge base needs to be tested
 
         Args:
             ignore_commits: commits to ignore, as they do not work (for instance)
