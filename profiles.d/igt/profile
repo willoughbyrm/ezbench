@@ -1,0 +1,52 @@
+source "$ezBenchDir/profiles.d/utils/common.sh"
+source "$ezBenchDir/profiles.d/utils/git-repo.sh"
+source "$ezBenchDir/profiles.d/utils/auto-deploy.sh"
+
+# Accessible variables
+# $ezBenchDir            [RO]: Directory of the ezbench
+# ------------------
+# $rounds                [WO]: Default number of rounds
+# $makeAndDeployCmd      [WO]: Command to compile and deploy the current git HEAD
+# $gitVersionDeployedCmd [WO]: Command to print out the sha1 of the version currently deployed
+# $repoDir               [WO]: Path to the git repo to use for this profile
+# $reportName            [WO]: Name to give to your report
+# $testsDir              [WO]: List of pathes to the directories containing the tests for this profile
+# $testsList             [WO]: List of tests that should be ran in this profile
+# $testExcludeList       [WO]: List of tests that should be excluded in this profile
+
+# MANDATORY: Print the currently-deployed version of the repo
+# Inputs:
+#   - $repoDir
+function profile_repo_deployed_version() {
+    "$PROFILE_DEPLOY_DIR/libexec/intel-gpu-tools/template" 2> /dev/null | head -n 1 | cut -d 'g' -f 2 | cut -d ' ' -f 1
+}
+
+# MANDATORY: Compile the version of the repo found in the current working
+# directory and install it to $(profile_repo_deployment_version_dir).
+# Inputs:
+#   - CWD: Set inside the repo at the right version
+#   - $repoDir
+# Outputs:
+#   - Print the build command line (echo "BUILD_INFO: build command: $cmd")
+#   - configure, compile and install to the prefix $(profile_repo_deployment_version_dir)
+#   - Fill the SHA1-db with all the information about the build when applicable
+function repo_compile_version() {
+    prefix_dir=$(profile_repo_deployment_version_dir)
+
+    ARGS=${REPO_IGT_PARAMETERS//\$REPO_IGT_PREFIX/$prefix_dir}
+    echo "BUILD_INFO: build command: ./autogen.sh $ARGS"
+    ./autogen.sh $ARGS || return 71
+
+    make -j8 || return 71
+    mkdir -p "$prefix_dir" || return 72
+    make_install_sha1_dump || return 72
+
+    return 0
+}
+
+
+export LD_LIBRARY_PATH="$PROFILE_DEPLOY_DIR/lib":$LD_LIBRARY_PATH
+export IGT_TEST_ROOT="$PROFILE_DEPLOY_DIR/libexec/intel-gpu-tools"
+
+rounds=3
+repoDir="$REPO_IGT"

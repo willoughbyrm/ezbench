@@ -12,6 +12,7 @@ XRANDR_RESET_ARGS="--auto"
 # Repo addresses
 REPO_MESA=/opt/source/mesa
 REPO_LINUX=/opt/source/linux
+REPO_IGT=/opt/source/intel-gpu-tools
 REPO_PERF_BISECT='/opt/source/bisect-test' # git://people.freedesktop.org/~mperes/bisect-test
 REPO_PIGLIT='/opt/source/piglit'
 REPO_XF86_VIDEO_INTEL=/home/mupuf/src/xf86-video-intel

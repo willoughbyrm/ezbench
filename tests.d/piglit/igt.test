@@ -27,7 +27,8 @@ function __igt_resume__ {
     # generate the report
     if [ -f "$piglit_output/metadata.json" ]; then
         # ignore the incomplete result to avoid being stuck in a loop
-        local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $OWATCH $REPO_PIGLIT/piglit resume $PIGLITCONF -n ${run_log_file}_tmp"
+        IGT_TEST_ROOT=${IGT_TEST_ROOT:-"$IGT_ROOT/tests"}
+        local cmdline="sudo IGT_TEST_ROOT="$IGT_TEST_ROOT" $OWATCH $REPO_PIGLIT/piglit resume $PIGLITCONF -n ${run_log_file}_tmp"
 
         ENV_DUMP_RESTRICT_TO_BINARY="NO_ENVDUMP_PLEASE" \
         $cmdline >> "$run_log_file.stdout" 2>> "$run_log_file.stderr"
@@ -70,7 +71,8 @@ function __igt_run__ {
     if [ -n "$PIGLITCONF" ]; then
 	ABORTFLAG="--abort-on-monitored-error"
     fi
-    local cmdline="sudo IGT_TEST_ROOT="$IGT_ROOT/tests" $OWATCH $REPO_PIGLIT/piglit run $PIGLITCONF $ABORTFLAG $PIGLIT_RUN_PARAMS -s --ignore-missing $parameters $testlist tests/igt.py ${piglit_output}"
+    IGT_TEST_ROOT=${IGT_TEST_ROOT:-"$IGT_ROOT/tests"}
+    local cmdline="sudo IGT_TEST_ROOT="$IGT_TEST_ROOT" $OWATCH $REPO_PIGLIT/piglit run $PIGLITCONF $ABORTFLAG $PIGLIT_RUN_PARAMS -s --ignore-missing $parameters $testlist tests/igt.py ${piglit_output}"
 
     ENV_DUMP_REQUIRE_ARGUMENT="$REPO_PIGLIT/piglit" \
     ENV_DUMP_NO_METRICS=1 \
