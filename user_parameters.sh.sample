@@ -143,7 +143,7 @@ IGT_TRACES=$IGT_ROOT/traces
 WATCHDOG_TIMEOUT_SYNC=120
 WATCHDOG_TIMEOUT_REBOOT=120
 
-# Rendercheck
+# Rendercheck: From https://cgit.freedesktop.org/~mperes/rendercheck/
 RENDERCHECK_FOLDER=/opt/benchmarks/rendercheck/
 
 # cairo-demos settings
