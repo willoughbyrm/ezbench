@@ -38,8 +38,6 @@
 #include <sys/wait.h>
 #include <stdarg.h>
 
-void wd_close();
-
 int usage(const char* exe)
 {
   printf("Usage: %s timeout command [parameters]\n", exe);
@@ -77,6 +75,9 @@ void log_msg(const char *fmt, ...) {
 int _watchdogfd[NUM_WDS];
 int _wdissoft[NUM_WDS];
 
+void wd_close_atexit();
+void wd_close(int);
+
 void init_wd()
 {
   int i;
@@ -87,7 +88,10 @@ void init_wd()
   }
 
   /* make sure the watchdog are closed when exiting */
-  atexit(wd_close);
+  atexit(wd_close_atexit);
+  signal(SIGTERM, wd_close);
+  signal(SIGINT, wd_close);
+  signal(SIGQUIT, wd_close);
 }
 
 int wd_settimeout(int timeout)
@@ -97,13 +101,20 @@ int wd_settimeout(int timeout)
   for (i = 0; i < NUM_WDS; ++i) {
     if (_watchdogfd[i] >= 0) {
       if (!_wdissoft[i]) {
+	/* Increase timeout for watchdogs that are not softdogs so
+	 * softdog triggers first. A softdog trigger will cause a
+	 * panic, and we want to see that in the logs.
+	 */
+
+	/* TODO: Only do the increase if there is also a softdog.
+	 */
         timeout += 10; /* TODO: Magic number */
       }
       origtimeout = timeout;
       ret = ioctl(_watchdogfd[i], WDIOC_SETTIMEOUT, &timeout);
       if (!ret) {
         ++valids;
-        log_msg("timeout set to %d (requested %d)\n", timeout, origtimeout);
+        log_msg("timeout for /dev/watchdog%d set to %d (requested %d)\n", i, timeout, origtimeout);
       }
       else {
           log_msg("timeout %d not accepted by /dev/watchdog%d, closing gracefully\n",
@@ -125,16 +136,17 @@ void wd_heartbeat()
   for (i = 0; i < NUM_WDS; ++i) {
     if (_watchdogfd[i] >= 0) {
       ret = ioctl(_watchdogfd[i], WDIOC_KEEPALIVE, 0);
-      log_msg("/dev/watchdog%d heartbeat (ret=%i)\n", i, ret);
-
-      /* WARNING:do not close the watchdog as we are never supposed to fail and
-       * we rather would like to die, than potentially getting stuck later on.
-       */
+      if (ret) {
+        /* WARNING:do not close the watchdog as we are never supposed to fail and
+         * we rather would like to die, than potentially getting stuck later on.
+         */
+        log_msg("/dev/watchdog%d heartbeat failed (ret=%i)\n", i, ret);
+      }
     }
   }
 }
 
-void wd_close()
+void wd_close(int signal)
 {
   int i;
 
@@ -145,8 +157,14 @@ void wd_close()
     write(_watchdogfd[i], "V", 1);
     close(_watchdogfd[i]);
     _watchdogfd[i] = -1;
-    log_msg("/dev/watchdog%d closed\n", i);
+    if (!signal)
+      log_msg("/dev/watchdog%d closed\n", i);
   }
+}
+
+void wd_close_atexit()
+{
+  wd_close(0);
 }
 
 void open_watchdog_dev(int timeout)
@@ -167,13 +185,14 @@ void open_watchdog_dev(int timeout)
       ret = ioctl(fd, WDIOC_GETSUPPORT, &info);
       if (!ret && !strcmp((char*)info.identity, "Software Watchdog")) {
         _wdissoft[i] = 1;
+        log_msg("Watchdog /dev/watchdog%d is a software watchdog\n", i);
       }
     }
   }
 
   valids = wd_settimeout(timeout);
   if (valids != opened) {
-    log_msg("Only %d/%d watchdogs kept", valids, opened);
+    log_msg("Only %d/%d watchdogs kept\n", valids, opened);
   }
   wd_heartbeat();
 }
@@ -182,7 +201,7 @@ void sysrq_write(const char* cmd)
 {
   FILE* sysrq = fopen("/proc/sysrq_trigger", "w");
   if (sysrq) {
-    fprintf(sysrq, cmd);
+    fprintf(sysrq, "%s", cmd);
     fclose(sysrq);
   }
 }
@@ -336,7 +355,7 @@ void overwatch(pid_t child, int timeout, int outpipe[2], int errpipe[2])
     wd_heartbeat();
   }
 
-  wd_close();
+  wd_close(0);
 
   if (r != child) {
     log_msg("Child turned undead, hire a priest\n");
