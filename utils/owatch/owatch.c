@@ -36,6 +36,9 @@
 #include <sys/select.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <stdarg.h>
+
+void wd_close();
 
 int usage(const char* exe)
 {
@@ -45,8 +48,34 @@ int usage(const char* exe)
   return 1;
 }
 
+void log_msg(const char *fmt, ...) {
+  va_list arg;
+
+  /* Write the error message */
+  va_start(arg, fmt);
+  fprintf(stdout, "owatch: ");
+  vfprintf(stdout, fmt, arg);
+  va_end(arg);
+  fflush(stdout);
+
+
+  FILE *f = fopen("/dev/kmsg", "w");
+  if (f) {
+    /* Write the message to the kernel logs */
+    fprintf(f, "owatch: ");
+    va_start(arg, fmt);
+    vfprintf(f, fmt, arg);
+    va_end(arg);
+
+    fflush(f);
+    fsync(fileno(f));
+    fclose(f);
+  }
+}
+
 #define NUM_WDS 25
 int _watchdogfd[NUM_WDS];
+int _wdissoft[NUM_WDS];
 
 void init_wd()
 {
@@ -54,26 +83,54 @@ void init_wd()
 
   for (i = 0; i < NUM_WDS; ++i) {
     _watchdogfd[i] = -1;
+    _wdissoft[i] = 0;
   }
+
+  /* make sure the watchdog are closed when exiting */
+  atexit(wd_close);
 }
 
-void wd_settimeout(int timeout)
+int wd_settimeout(int timeout)
 {
-  int i;
+  int ret, i, valids = 0, origtimeout;
 
   for (i = 0; i < NUM_WDS; ++i) {
-    if (_watchdogfd[i] >= 0)
-      ioctl(_watchdogfd[i], WDIOC_SETTIMEOUT, &timeout);
+    if (_watchdogfd[i] >= 0) {
+      if (!_wdissoft[i]) {
+        timeout += 10; /* TODO: Magic number */
+      }
+      origtimeout = timeout;
+      ret = ioctl(_watchdogfd[i], WDIOC_SETTIMEOUT, &timeout);
+      if (!ret) {
+        ++valids;
+        log_msg("timeout set to %d (requested %d)\n", timeout, origtimeout);
+      }
+      else {
+          log_msg("timeout %d not accepted by /dev/watchdog%d, closing gracefully\n",
+              timeout, i);
+          write(_watchdogfd[i], "V", 1);
+          close(_watchdogfd[i]);
+          _watchdogfd[i] = -1;
+      }
+    }
   }
+
+  return valids;
 }
 
 void wd_heartbeat()
 {
-  int i;
+  int ret, i;
 
   for (i = 0; i < NUM_WDS; ++i) {
-    if (_watchdogfd[i] >= 0)
-      ioctl(_watchdogfd[i], WDIOC_KEEPALIVE, 0);
+    if (_watchdogfd[i] >= 0) {
+      ret = ioctl(_watchdogfd[i], WDIOC_KEEPALIVE, 0);
+      log_msg("/dev/watchdog%d heartbeat (ret=%i)\n", i, ret);
+
+      /* WARNING:do not close the watchdog as we are never supposed to fail and
+       * we rather would like to die, than potentially getting stuck later on.
+       */
+    }
   }
 }
 
@@ -88,6 +145,7 @@ void wd_close()
     write(_watchdogfd[i], "V", 1);
     close(_watchdogfd[i]);
     _watchdogfd[i] = -1;
+    log_msg("/dev/watchdog%d closed\n", i);
   }
 }
 
@@ -95,18 +153,46 @@ void open_watchdog_dev(int timeout)
 {
   int fd;
   char buf[255];
-  int i;
+  int i, ret, valids, opened = 0;
+  struct watchdog_info info;
 
   for (i = 0; i < NUM_WDS; ++i) {
     snprintf(buf, 255, "/dev/watchdog%d", i);
     fd = open(buf, O_WRONLY);
     if (fd >= 0) {
-      printf("owatch: Using watchdog device %s\n", buf);
+      log_msg("Using watchdog device %s\n", buf);
       _watchdogfd[i] = fd;
+      ++opened;
+
+      ret = ioctl(fd, WDIOC_GETSUPPORT, &info);
+      if (!ret && !strcmp((char*)info.identity, "Software Watchdog")) {
+        _wdissoft[i] = 1;
+      }
     }
   }
 
-  wd_settimeout(timeout);
+  valids = wd_settimeout(timeout);
+  if (valids != opened) {
+    log_msg("Only %d/%d watchdogs kept", valids, opened);
+  }
+  wd_heartbeat();
+}
+
+void sysrq_write(const char* cmd)
+{
+  FILE* sysrq = fopen("/proc/sysrq_trigger", "w");
+  if (sysrq) {
+    fprintf(sysrq, cmd);
+    fclose(sysrq);
+  }
+}
+
+void sync_and_panic()
+{
+  sysrq_write("c");
+  sysrq_write("s");
+  sysrq_write("u");
+  sysrq_write("b");
 }
 
 bool have_any_wd()
@@ -125,7 +211,7 @@ void watchdog_die(int timeout)
 {
   if (have_any_wd()) {
     wd_settimeout(1);
-    sleep(3);
+    sleep(10);
   }
 }
 
@@ -147,7 +233,7 @@ int pipe_output(int timeout, int out, int err)
 
   n = select(nfds, &set, NULL, NULL, &tv);
   if (n < 0) {
-    perror("select");
+    log_msg("select() failed in pipe_output(): %s\n", strerror(n));
     return -2;
   }
   if (!n) {
@@ -158,7 +244,7 @@ int pipe_output(int timeout, int out, int err)
   if (FD_ISSET(out, &set)) {
     ssize_t s = read(out, buf, sizeof(buf));
     if (s < 0) {
-      perror("read");
+      log_msg("reading stdout failed in pipe_output(): %s\n", strerror(n));
       return -2;
     }
 
@@ -170,6 +256,7 @@ int pipe_output(int timeout, int out, int err)
   if (FD_ISSET(err, &set)) {
     ssize_t s = read(err, buf, sizeof(buf));
     if (s < 0) {
+      log_msg("reading stderr failed in pipe_output(): %s\n", strerror(n));
       perror("read");
       return -2;
     }
@@ -193,26 +280,41 @@ void overwatch(pid_t child, int timeout, int outpipe[2], int errpipe[2])
   close(outpipe[1]);
   close(errpipe[1]);
 
-  open_watchdog_dev(timeout);
+  /* Set the timeout to $timeout + 10s to give ourselves some time to close
+   * things properly if the machine allows us
+   */
+  open_watchdog_dev(timeout + 10);
 
   while (n > 0) {
     wd_heartbeat();
     n = pipe_output(timeout, outpipe[0], errpipe[0]);
   }
 
-  wd_heartbeat();
-
   close(outpipe[0]);
   close(errpipe[0]);
 
   if (n == 0) {
-    printf("owatch: TIMEOUT!\n");
+    log_msg("TIMEOUT!\n");
+
+    /* One more heartbeat to keep the machine alive for debug info */
+    wd_settimeout(10);
+    wd_heartbeat();
+
+    /* TODO: Force a sync, then a panic to make sure logs are being saved to pstore */
+    sync_and_panic();
+
+    /* We only reach this point if the above function could not boot the machine. Example reasons:
+     * No /proc/sysrq_trigger, not running as root
+     */
 
     /* Hack: If we have a hw watchdog, don't bother killing children.
      * Just stop the heartbeat. */
-    watchdog_die(3);
+    watchdog_die(10);
 
-    printf("owatch: Killing children\n");
+    /* We only reach this point if 1) sysrq above did not boot 2) we didn't
+     * have watchdogs that could boot the machine. */
+
+    log_msg("Killing children\n");
 
     if (!kill(-child, 0)) {
       /* Child was able to setsid, process group exists.
@@ -237,7 +339,7 @@ void overwatch(pid_t child, int timeout, int outpipe[2], int errpipe[2])
   wd_close();
 
   if (r != child) {
-    printf("Child turned undead, hire a priest\n");
+    log_msg("Child turned undead, hire a priest\n");
     exit(1);
   }
 
@@ -248,9 +350,7 @@ void overwatch(pid_t child, int timeout, int outpipe[2], int errpipe[2])
     } else {
       exit(1);
     }
-  }
-
-  if (n == -2) {
+  } else if (n == -2) {
     /* error occurred */
     exit(1);
   }
