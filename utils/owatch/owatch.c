@@ -199,7 +199,7 @@ void open_watchdog_dev(int timeout)
 
 void sysrq_write(const char* cmd)
 {
-  FILE* sysrq = fopen("/proc/sysrq_trigger", "w");
+  FILE* sysrq = fopen("/proc/sysrq-trigger", "w");
   if (sysrq) {
     fprintf(sysrq, "%s", cmd);
     fclose(sysrq);
@@ -323,7 +323,7 @@ void overwatch(pid_t child, int timeout, int outpipe[2], int errpipe[2])
     sync_and_panic();
 
     /* We only reach this point if the above function could not boot the machine. Example reasons:
-     * No /proc/sysrq_trigger, not running as root
+     * No /proc/sysrq-trigger, not running as root
      */
 
     /* Hack: If we have a hw watchdog, don't bother killing children.
