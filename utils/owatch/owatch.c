@@ -89,9 +89,9 @@ void init_wd()
 
   /* make sure the watchdog are closed when exiting */
   atexit(wd_close_atexit);
-  signal(SIGTERM, wd_close);
-  signal(SIGINT, wd_close);
-  signal(SIGQUIT, wd_close);
+  for (i = 1; i <= 15; ++i) {
+    signal(i, wd_close);
+  }
 }
 
 int wd_settimeout(int timeout)
@@ -149,6 +149,7 @@ void wd_heartbeat()
 void wd_close(int signal)
 {
   int i;
+  char buf[255];
 
   for (i = 0; i < NUM_WDS; ++i) {
     if (_watchdogfd[i] < 0)
@@ -159,6 +160,18 @@ void wd_close(int signal)
     _watchdogfd[i] = -1;
     if (!signal)
       log_msg("/dev/watchdog%d closed\n", i);
+  }
+
+  if (signal) {
+    strcpy(buf, "owatch: killed by signal ");
+    i = strlen(buf);
+    if (signal >= 10) {
+      buf[i++] = '0' + signal / 10;
+    }
+    buf[i++] = '0' + signal % 10;
+    buf[i++] = '\n';
+    buf[i] = '\0';
+    write(2, buf, i);
   }
 }
 
