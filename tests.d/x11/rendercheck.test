@@ -2,11 +2,12 @@ test_name="x11:rendercheck"
 test_type="unified"
 
 RENDERCHECK="$RENDERCHECK_FOLDER/rendercheck"
+RENDERCHECK_FORMATS="${RENDERCHECK_FORMATS:-a8r8g8b8,x8r8g8b8}"
 
 [ -e "$RENDERCHECK" ] || return 1
 
 x11:rendercheck_run() {
-    run_bench 0 "$RENDERCHECK" -r -f a8r8g8b8,x8r8g8b8 2>&1 > /dev/null | grep "^## " | sed 's/## \(.*\): \+\(.*\)/\1: str(\2)/g'
+    run_bench 0 "$RENDERCHECK" -r -f "$RENDERCHECK_FORMATS" 2>&1 > /dev/null | grep "^## " | sed 's/## \(.*\): \+\(.*\)/\1: str(\2)/g'
 
     # Go through all the subtests we wanted to get and check if all of them
     # are present. If not, mark them as missing.

@@ -146,6 +146,7 @@ WATCHDOG_TIMEOUT_REBOOT=120
 # Rendercheck: From https://cgit.freedesktop.org/~mperes/rendercheck/
 # Must point to the directory containing the 'rendercheck' binary
 RENDERCHECK_FOLDER=/opt/benchmarks/rendercheck/
+RENDERCHECK_FORMATS="a8r8g8b8,x8r8g8b8"
 
 # cairo-demos settings
 CAIRO_DEMOS=/opt/benchmarks/cairo-demos
