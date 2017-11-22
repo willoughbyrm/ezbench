@@ -8,8 +8,6 @@ function __unigine_valley_run__ {
     height=$3
 
     LD_LIBRARY_PATH=bin:bin/x64:$LD_LIBRARY_PATH \
-    MESA_EXTENSION_OVERRIDE="-GL_ARB_sample_shading -GL_ARB_blend_func_extended" \
-    MESA_GL_VERSION_OVERRIDE="3.2" \
     run_bench 215 ./bin/valley_x64 \
         -video_app opengl \
         -data_path ../ \
