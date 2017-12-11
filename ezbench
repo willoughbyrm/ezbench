@@ -105,6 +105,7 @@ class RestHandler(CommandHandler):
     def __init__(self, server):
         self.server = server
         self.machines = []
+        self.attributes = {}
 
     def get(self, url):
         fullurl = self.server + url
@@ -174,7 +175,7 @@ class RestHandler(CommandHandler):
         if state is None and profile is not None:
             payload = { "description": "Test job",
                         "profile": profile,
-                        "attributes": {},
+                        "attributes": self.attributes,
                         "machines": []
                         }
             for m in self.machines:
