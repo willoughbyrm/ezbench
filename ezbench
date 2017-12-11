@@ -194,8 +194,8 @@ class RestHandler(CommandHandler):
         # TODO: tests_exclude
         work = { "commits": {} }
         for commit in commits:
+            work["commits"][commit] = { "tests": {} }
             for test in tests:
-                work["commits"][commit] = { "tests": {} }
                 work["commits"][commit]["tests"][test] = rounds
         self.patch(self.job_url + "/work", work)
 
