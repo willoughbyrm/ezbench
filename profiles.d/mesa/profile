@@ -47,7 +47,7 @@ function repo_compile_version() {
 export LD_LIBRARY_PATH="$PROFILE_DEPLOY_DIR/lib":$LD_LIBRARY_PATH
 
 # for Vulkan
-export VK_ICD_FILENAMES="$PROFILE_DEPLOY_DIR/share/vulkan/icd.d/intel_icd.x86_64.json"
+export VK_ICD_FILENAMES="$PROFILE_DEPLOY_DIR/share/vulkan/icd.d/intel_icd.x86_64.json:$PROFILE_DEPLOY_DIR/share/vulkan/icd.d/radeon_icd.x86_64.json"
 
 rounds=3
 repoDir="$REPO_MESA"
