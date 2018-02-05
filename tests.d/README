@@ -1,0 +1,127 @@
+= EzBench - Test profiles =
+
+== Introduction ==
+
+This folder contains the test profiles, which allow ezbench to run benchmarks, testsuites, and
+generate images.
+
+== Writing a test profile ==
+
+To create a test profile, add inside tests.d/ a new file with the extension .test. For example,
+for an OpenGL benchmark named "Super Benchmark 2.3", one would create the file
+tests.d/opengl/super_benchmark_2_3.test
+
+The .test file is a bash script that will be sourced by ezbench's runner. It has to define some
+variables, and functions that will be called to execute the test.
+
+To be considered valid, a test needs to export the following parameters and functions:
+ - test_name: a list of space-separated test names. For example: test_name="test1 test2 test3"
+ - ${test_name}_run(): a function that will be called when ezbench's runner is trying to run
+ the test named $test_name.
+
+Here is an example of a minimal test profile:
+
+	test_name="glxgears:window"       # Name of the test
+	test_exec_time=21                 # Time the benchmark is expected to run
+	test_unit="FPS"                   # Unit of the numbers reported by the test profile
+
+	# Verify that the glxgears binary is installed, otherwise prevent the test from being listed
+	which glxgears >/dev/null 2>&1 || return 1
+
+	# Function that will be called when ezbench will want to run the test
+	glxgears:window_run() {
+		# Run the benchmark for up to 21 seconds, with the wanted profile. The run_bench function
+		# is provided by ezbench's runner to capture the output of the test, and other metrics.
+		run_bench 21 glxgears 2> /dev/null | grep 'frames in ' | cut -d ' ' -f7
+	}
+
+Here is a more complete example that shows how to generate a dynamic list of available subtests,
+and that reduces code duplication by factoring out the execution of the test.
+
+	test_type="unified"                    # Type of output format. See the "Output format" section
+	test_exec_time=60                      # Number of seconds the test is expected to take
+
+	# Check dependencies and return 1 if one of them is missing. This will prevent the tests from
+	# being listed as available. Define SUPER_BENCHMARK_FOLDER in user_parameters.sh.
+	hash $SUPER_BENCHMARK_FOLDER/binary 2> /dev/null || return 1
+
+	# Function that takes the profile to execute (low, mid, or high), executes the benchmark, then
+	# generate a ezbench-readable format(See the "Output format" section to learn more about this).
+	function __gl:super_benchmark__() {
+		profile=$1
+
+		# Run the benchmark for up to 70 seconds, with the wanted profile. The run_bench function
+		# is provided by ezbench's runner to capture the output of the test, and other metrics.
+		output=$(run_bench 70 $SUPER_BENCHMARK_FOLDER/binary --profile $profile)
+		if [ $? -eq 0 ]; then
+			# get the values of the different subtests
+			avg_fps=$(echo "$output" | grep "Avg FPS:" | cut -d ' ' -f 3)  # Parse "Avg FPS: 32 FPS"
+			max_fps=$(echo "$output" | grep "Max FPS:" | cut -d ' ' -f 3)  # Parse "Max FPS: 67 FPS"
+			min_fps=$(echo "$output" | grep "Min FPS:" | cut -d ' ' -f 3)  # Parse "Min FPS: 25 FPS"
+
+			# Output the values of the different subtests
+			echo "fps_avg: float($avg_fps) FPS"
+			echo "fps_min: float($min_fps) FPS"
+			echo "fps_max: float($max_fps) FPS"
+
+			# State that the test executed correctly
+			echo ": str(completed)"
+		fi
+	}
+
+	# Create 3 tests by stating adding 3 space-separated testnames in $test_name, and by
+	for profile in low mid high; do
+		test_name="$test_name gl:super_benchmark:${profile}"
+		eval "gl:super_benchmark:${profile}_run() { __gl:super_benchmark__ "$profile"; }"
+	done
+
+
+== Output format ==
+
+The test profiles must execute the benchmark and output in stdout a format that depends on the
+test_type.
+
+=== Unified test type ===
+
+This is the recommended way to output data as it allows outputing values for multiple subtests, and
+for each subtest to have its own unit.
+
+To use the unified test type, please use the following line:
+
+	test_type="unified"
+
+The expected output format is the following:
+
+	SubTestName: type(value) unit
+
+Here is the definition of the different parts:
+ - $SubTestName can be any string, but cannot contain a ':'.
+ - $type can be float, str, or img:
+	- float: the $value must be an integer or a float. For example, 42 or 3.2.
+	- str: the $value must be a string. For example: pass, or fail.
+	- img: the $value must be the relative path to an image, relative from $logsFolder.
+ - $unit can be any string.
+
+IMPORTANT: Unless instructed to only run a particular list of subtests, it is mandatary to add an
+empty $SubTestName, which will be used as the main value for the test and will tell ezbench that
+the execution was completed correctly. Failing to do so will result in a loop as ezbench would
+retry to generate the results for the full test over and over again.
+
+Here is an example of a valid output, as expected from a unified test type:
+
+	GtkEntry: float(0.09) s
+	GtkComboBox: float(6.06) s
+	GtkComboBoxEntry: float(3.47) s
+	GtkSpinButton: float(0.51) s
+	GtkProgressBar: float(0.84) s
+	GtkToggleButton: float(0.58) s
+	GtkCheckButton: float(0.32) s
+	GtkRadioButton: float(0.47) s
+	GtkTextView-Add text: float(11.04) s
+	GtkTextView-Scroll: float(1.08) s
+	GtkDrawingArea-Lines: float(3.58) s
+	GtkDrawingArea-Circles: float(4.06) s
+	GtkDrawingArea-Text: float(0.81) s
+	GtkDrawingArea-Pixbufs: float(0.64) s
+	Total: float(33.72) s
+	: str(completed)
