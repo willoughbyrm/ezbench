@@ -3,6 +3,7 @@
 __pycache__
 *~
 
+.tox/
 builds/
 logs/
 SHA1_DB/db/
